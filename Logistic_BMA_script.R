@@ -154,7 +154,8 @@ comparison_table <- bma_full %>%
 nomenclature2<-nomenclature
 colnames(nomenclature2)[1]<-"Nom"
 colnames(comparison_table)[1]<-"Nom"
-Temp_table<-left_join(comparison_table,nomenclature2,by=c("Nom")) %>% mutate(Nom=Def)
+Temp_table<-left_join(comparison_table,nomenclature2,by=c("Nom")) %>% mutate(Nom=Def) %>% arrange(post_prob)
+comparison_table<-Temp_table %>% select(Nom,post_prob)
 
 ## Exporting the results
 write.table(Temp_table,paste("Table_determinants_",Sys.Date(),".csv"),sep=";",col.names=T,row.names=F)
@@ -170,6 +171,7 @@ plot_df<-plot_df %>% mutate(ModelType=case_when(ModelType=="mean_top"~"mean top 
                                                 T~"mean BMA"))
 
 plot_df$ModelType<-factor(plot_df$ModelType,levels=c("mean top model","mean BMA","mean top 5 models"))
+plot_df$Nom<-factor(plot_df$Nom,levels=Temp_table$Nom)
 
 # Plot 1: Coefficient comparison plot
 plot1<-ggplot(plot_df, aes(x = reorder(Nom, Coefficient), y = Coefficient,
@@ -196,6 +198,9 @@ plot1<-ggplot(plot_df, aes(x = reorder(Nom, Coefficient), y = Coefficient,
         axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
 
 # Plot 2: Inclusion probability barplot
+plot_df2<-plot_df %>% select(-c(ModelType,Coefficient)) %>% distinct
+plot_df2$Nom<-factor(plot_df2$Nom,levels=Temp_table$Nom)
+
 plot2<-ggplot(comparison_table, aes(x = reorder(Nom, post_prob), y = post_prob)) +
   geom_col(fill = "steelblue",color="black") +
   geom_text(aes(x = reorder(Nom, post_prob), y = post_prob+4,label=post_prob),size=6)+
