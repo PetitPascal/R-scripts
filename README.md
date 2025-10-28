@@ -1,5 +1,7 @@
 **Collection of reproducible data analysis scripts in R**
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17047856.svg)](https://doi.org/10.5281/zenodo.17047856)
+
 This repository provides a curated collection of R scripts designed to support reproducible data analysis.
 
 The scripts have been developed and used in several of my publications and cover a range of analytical approaches including survival analysis, Bayesian model averaging, and machine learning methods such as Extreme Gradient Boosting (XGBoost).
