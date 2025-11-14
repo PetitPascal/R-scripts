@@ -692,7 +692,9 @@ plot1<-ggplot(test_tmp,aes(y=feature,x=mean_value,col=impact))+
   geom_point()+
   geom_errorbar(aes(xmin = IC_2.5, xmax = IC_97.5))+
   scale_x_continuous("mean |SHAP value|",label=function(x) abs(x))+
-  geom_text(aes(x=IC_97.5,y=feature,label=abs(IC_97.5)),size=5,position=position_nudge(x = if_else(test_tmp$IC_97.5>=0,0.15,-0.15)))+
+  geom_text(aes(x=IC_97.5,y=feature,label=abs(IC_97.5)),size=5,position=position_nudge(x = if_else(test_tmp$IC_97.5>=0,
+                                                                                                   round(max(test_tmp$IC_97.5,na.rm=T)/10),
+                                                                                                   -round(max(test_tmp$IC_97.5,na.rm=T)/10))))+
   scale_y_discrete("")+
   theme_bw()+
   scale_color_manual("Direction:",
@@ -720,7 +722,9 @@ test_tmp$feature<-factor(test_tmp$feature,levels=rev(unique(ordre_def$feature)))
 
 plot2<-ggplot(test_tmp,aes(y=feature,x=mean_value,fill=impact))+
   geom_bar(stat = "identity",col='black')+
-  geom_text(aes(x=mean_value,y=feature,label=abs(mean_value)),size=6,position=position_nudge(x = if_else(test_tmp$mean_value>=0,0.05,-0.05)))+
+  geom_text(aes(x=mean_val,y=feature,label=mean_SHAP),size=6,position=position_nudge(x = if_else(test_tmp$mean_val>=0,
+                                                                                                 round(max(test_tmp$mean_val,na.rm=T)/10),
+                                                                                                 -round(max(test_tmp$mean_val,na.rm=T)/10))))+
   scale_x_continuous("mean |SHAP value|",label=function(x) abs(x))+
   scale_y_discrete("")+
   theme_bw()+
@@ -765,3 +769,4 @@ fwrite(test_tmp,paste("test_tmp_",Sys.Date(),".csv",sep=""), sep = ";", row.name
 fwrite(test,paste("test_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
 fwrite(shap,paste("shap_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
 fwrite(shap_score_sub,paste("shap_score_sub_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
+
