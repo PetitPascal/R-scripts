@@ -6,7 +6,7 @@ gctorture(FALSE)
 
 ## Installing packages if needed
 pack_needed<-c("data.table","tidyverse","mllrnrs","mlsurvlrnrs","survival","splitTools","conflicted","mlexperiments","kdry","survminer","timeROC","cluster","pec",
-               "factoextra","R6","xgboost","mgcv","quantreg","parallel")
+               "factoextra","R6","xgboost","mgcv","quantreg","parallel","here")
 for (i in 1:length(pack_needed)){
   if(pack_needed[i]%in%.packages(all.available=TRUE)){
   }else{
@@ -31,6 +31,7 @@ library(cluster)
 library(factoextra)
 library(pec)
 library(xgboost)
+library(here)
 
 ## Preventing package conflicts
 conflict_prefer("select", "dplyr") 
@@ -39,7 +40,7 @@ conflict_prefer("slice", "dplyr")
 conflict_prefer("alpha", "scales")
 
 ## Setting the working directory
-setwd("C:/Users/Pascal/Documents/MSA/Resultats/ML Cox/NSA/AD")
+here::here("Survival XGBoost Cox analysis")
 
 ## Setting seed
 seed <- 123
@@ -81,32 +82,49 @@ std1 <- function(x, clip = TRUE) {
 ## Function for formatting the display of summary statistics
 test_format<-function(x){
   x<-as.numeric(x)
+  sign_x<-if_else(x<0,"neg","pos")
+  x<-abs(x)
+  x_raw<-x
   
-  if(is.na(x)|x==""|x=="NA"){
-    x<-""
-    signe<-"pos"
-  }else{
-    signe<-if_else(x<0,"neg","pos")
-    x<-abs(x)
+  if(is.na(x)|x==""|x=="NA"|is.infinite(x)){
+    x_raw<-0
+  }
+  
+  if(x_raw>=100){
+    virg_pos<-str_locate(as.character(x_raw),"[.]")[1]
     
-    if(x!=0&(x<0.01|x>=10000)){
+    if(!is.na(virg_pos)&as.numeric(substr(x_raw,virg_pos+1,virg_pos+1))>=5){
+      x<-x+1
+      x<-as.numeric(substr(x,1,virg_pos-1))
+    }
+    
+  }
+  
+  if(is.na(x)|x==""|x=="NA"|is.infinite(x)){
+    x<-""
+  }else{
+    
+    if(x<0.01|x>=10000){
       x<-format(signif(x,3),scientific = T)
       
       if(nchar(x)==8&substr(x,4,4)!="e"){
-        if(as.numeric(substr(x,4,4))>=5){
+        if(as.numeric(substr(x,4,4))>=5&x<0.01){
           
           x1<-as.numeric(substr(x,1,4))+0.1
           x2<-substr(x,5,8)
-          x<-paste(substr(x1,1,3),x2,sep="")
+          x<-paste(substr(x1,1,4),x2,sep="")
         }else{
-          x<-paste(substr(x,1,3),substr(x,5,8),sep="")
+          x<-paste(substr(x,1,4),substr(x,5,8),sep="")
         }
       }else{
         x<-x
       }
       
     }else{
-      x<-signif(x,2)
+      
+      x_save<-x
+      x<-signif(x,3)
+      
       if(nchar(x)==6){
         x<-as.numeric(substr(x,1,5))
       }
@@ -119,18 +137,25 @@ test_format<-function(x){
           x<-substr(x,1,4)
         }
       }else{
-        x<-as.character(x)
+        if(x>=1000){
+          x<-as.character(signif(x_save,4))
+        }else{
+          x<-as.character(x)
+        }
       }
     }
     
   }
   
-  if(signe=="neg"){
+  if(sign_x=="neg"&x_raw!=0){
     x<-paste("-",x,sep="")
   }
   
-  return(x)
+  if(x=="0e+00"){
+    x<-"0"
+  }
   
+  return(x)
 }
 
 ## Normalization function
@@ -184,17 +209,18 @@ determine_direction<-function(df,feature_col,shap_col){
 #----------------------------------------------------------------
 #### Data import and preprocessing ####
 
-## Importing the variable thesaurus
-nomenclature <- as_tibble(fread("F:/MSA/Nomenclature/Nomenclature_variable_ML_13-02-24.csv", sep=";", header = TRUE))
-
 ## Importing the clean dataset
-clean_data<-as_tibble(fread("F:/MSA/Data/Base/NSA_ML_AT low back_all_2024-05-29.txt", sep=";", header = TRUE))
+clean_data<-as_tibble(na.omit(survival::colon) %>% filter(etype == 2) %>% select(-id) %>% mutate(rx=case_when(rx=="Obs"~0,rx=="Lev"~1,T~2)))
+
+## Renaming outcome variables
+colnames(clean_data)[which(colnames(clean_data)=="status")]<-"Disease_status"
+colnames(clean_data)[which(colnames(clean_data)=="time")]<-"time_to_diagnosis"
 
 ## Transforming the clean dataset into data.table
 dataset <- as.data.table(clean_data)
 
 ## Creating vectors with the independent and dependent variable names
-surv_cols <- c("Disease_case", "time_to_diagnosis")
+surv_cols <- c("Disease_status", "time_to_diagnosis")
 feature_cols <- setdiff(colnames(dataset), c(surv_cols,"ID"))
 
 ## Creating split vector and data partition
@@ -210,16 +236,16 @@ print(good_split)
 
 ## Creating the training set
 train_x <- model.matrix(~ -1 + ., dataset[data_split$train, ..feature_cols])
-train_y <- Surv(time = dataset[data_split$train, time_to_diagnosis], event = dataset[data_split$train, Disease_case])
+train_y <- Surv(time = dataset[data_split$train, time_to_diagnosis], event = dataset[data_split$train, Disease_status])
 
 ## Creating the test set
 test_x <- model.matrix(~ -1 + ., dataset[data_split$test, ..feature_cols])
-test_y <- Surv(time = dataset[data_split$test, time_to_diagnosis], event = dataset[data_split$test, Disease_case])
+test_y <- Surv(time = dataset[data_split$test, time_to_diagnosis], event = dataset[data_split$test, Disease_status])
 
 ## Computing sample weights to account for imbalance data
-event_counts <- dataset[data_split$train, .N, by = Disease_case][, weight := 1 / N]
+event_counts <- dataset[data_split$train, .N, by = Disease_status][, weight := 1 / N]
 train_data <- dataset[data_split$train]
-train_weights <- event_counts[train_data, on = "Disease_case", weight]
+train_weights <- event_counts[train_data, on = "Disease_status", weight]
 
 ## Creating cross-validation (CV) folds
 split_vector_train <- splitTools::multi_strata(dataset[data_split$train, ..surv_cols], strategy = "kmeans", k = 4)
@@ -393,6 +419,124 @@ c_index_train_final <- c_index(predictions = preds_train_final, ground_truth = t
 c_index_test_final  <- c_index(predictions = preds_test_final,  ground_truth = test_y)
 
 #----------------------------------------------------------------
+#### Cox model evaluation ####
+
+#- - - - - - - - - -
+## Grouping individuals into groups
+
+# Creating a data frame with predictions and outcomes
+risk_df <- data.frame(risk_score = preds_xgboost[["mean"]],
+                      time = test_y[, "time"],
+                      status = test_y[, "status"])
+
+# Creating sex groups
+risk_df$sex <- as.factor(unlist(dataset[data_split$test, "sex"]))
+
+# Creating age groups
+risk_df$age <- dataset[data_split$test, "age"]
+risk_df$age_group <- ifelse(risk_df$age < 60, "<60", "≥60")
+
+# Combining age group and sex
+risk_df$sex_age <- interaction(risk_df$age_group, risk_df$sex, sep = "_")
+risk_df$sex_age <- as.factor(risk_df$sex_age)
+
+# Creating risk tertile groups
+risk_df <- risk_df %>%
+           mutate(risk_group = ntile(risk_score, 3)) %>%
+           mutate(risk_group = factor(risk_group, labels = c("Low", "Medium", "High")))
+
+#- - - - - - - - - -
+## Computing hazard ratios
+
+# Fiting Cox model on test data using sex
+cox_model_sex <- coxph(Surv(time, status) ~ sex, data = risk_df)
+summary(cox_model_sex)
+
+# Fiting Cox model on test data using age group
+cox_model_age <- coxph(Surv(time, status) ~ age_group, data = risk_df)
+summary(cox_model_age)
+
+# Fiting Cox model on test data using age and sex groups combined
+cox_model_sex_age <- coxph(Surv(time, status) ~ sex_age, data = risk_df)
+summary(cox_model_sex_age)
+
+# Fiting Cox model on test data using the tertile groups -> hazard ratios for medium and high risk vs. low risk group
+cox_model_tertiles <- coxph(Surv(time, status) ~ risk_group, data = risk_df)
+summary(cox_model_tertiles)
+
+#- - - - - - - - - -
+## Kaplan-Meier plot by sex
+
+# KM curve by predicted sex
+km_sex <- survfit(Surv(time, status) ~ sex, data = risk_df)
+
+# Plot
+survminer::ggsurvplot(
+  km_sex,
+  data = risk_df,
+  risk.table = TRUE,
+  pval = TRUE,
+  palette = c("#40B696", "#F1CB0E"),
+  legend.title = "Sex",
+  legend.labs = c("Male", "Female"),
+  xlab = "Time",
+  ylab = "Survival Probability")
+
+#- - - - - - - - - -
+## Kaplan-Meier plot by age groups
+
+# KM curve by predicted age
+km_age <- survfit(Surv(time, status) ~ age_group, data = risk_df)
+
+# Plot
+survminer::ggsurvplot(
+  km_age,
+  data = risk_df,
+  risk.table = TRUE,
+  pval = TRUE,
+  palette = c("#40B696", "#F1CB0E"),
+  legend.title = "Age Group",
+  legend.labs = c("<60", "≥60"))
+
+#- - - - - - - - - -
+## Age and sex interaction
+
+# KM curve - fitting survival curve
+surv_fit_sex_age <- survfit(Surv(time, status) ~ sex_age, data = risk_df)
+
+# Plot
+survminer::ggsurvplot(
+  fit = surv_fit_sex_age,
+  data = risk_df,
+  risk.table = TRUE,
+  pval = TRUE,
+  conf.int = F,
+  palette = "Set1",
+  legend.title = "Predicted Risk × Age",
+  xlab = "Time",
+  ylab = "Survival probability",
+  ggtheme = theme_minimal())
+
+#- - - - - - - - - -
+## Kaplan-Meier plot by risk tertile group
+
+# KM curve by predicted risk tertile
+km_fit <- survfit(Surv(time, status) ~ risk_group, data = risk_df)
+
+# Plot
+survminer::ggsurvplot(
+  km_fit,
+  data = risk_df,
+  risk.table = TRUE,
+  pval = TRUE,
+  conf.int = TRUE,
+  palette = c("#40B696", "#F1CB0E", "red"),
+  legend.title = "Predicted Risk Group",
+  legend.labs = c("Low", "Medium", "High"),
+  xlab = "Time",
+  ylab = "Survival probability")
+
+#----------------------------------------------------------------
 #### Feature importance ####
 
 #- - - - - - - - - -
@@ -401,16 +545,7 @@ names <- final_mod$feature_names
 
 ## Creating the importance matrix
 importance_matrix <- xgb.importance(names, model = final_mod)
-
-## Adding full labels to features
-nomencalture2<-nomenclature
-colnames(nomencalture2)[1]<-"Feature"
-
 importance_matrix<-as_tibble(importance_matrix)
-importance_matrix<-left_join(importance_matrix,nomencalture2,by="Feature")
-
-colnames(importance_matrix)[1]<-"feat"
-colnames(importance_matrix)[5]<-"Feature"
 
 #- - - - - - - - - -
 ## Selecting top 50 predictors
@@ -482,7 +617,7 @@ Shap_val<-as_tibble(shap_long2) %>%
   mutate(IC_2.5=quantile(abs(value),0.025),
          IC_97.5=quantile(abs(value),0.975),
          mean_val=mean(abs(value),na.rm=T)) %>%
-  select(variable,mean_val,IC_2.5,IC_97.5) %>% 
+  select(variable,mean_value,IC_2.5,IC_97.5) %>% 
   distinct %>% 
   arrange(desc(mean_value)) %>%
   mutate(mean_SHAP=paste(signif(mean_value,3)," (",signif(IC_2.5,3),"; ",signif(IC_97.5,3),")",sep="")) %>% ungroup
@@ -515,17 +650,13 @@ tempopo <- left_join(tempopo, shap_tempo, by = c("id", "feature"))
 test_save<-xgb.ggplot.shap.summary(as.matrix(test_x[,final_mod$feature_names]), contr, model = final_mod,top_n=50)
 test_save<-as_tibble(test_save$data)
 
-colnames(nomencalture2)[1]<-"feature"
-
-tempopo<-left_join(tempopo,nomencalture2,by=base::intersect(colnames(tempopo),colnames(nomencalture2)))
 tempopo<-left_join(tempopo,Shap_val,by=base::intersect(colnames(tempopo),colnames(Shap_val)))
-Shap_val<-left_join(Shap_val,nomencalture2,by="feature")
 
 test3<-Shap_val %>% arrange(desc(as.numeric(mean_value)))
 
 #- - - - - - - - - -
 ## SHAP directionality summary
-direction_impact<-test %>% group_by(feature) %>%
+direction_impact<-test_save %>% group_by(feature) %>%
   group_map(~tibble(feature=.y$feature,
                     direction=determine_direction(.x,"feature_value","shap_value")
   )) %>%
@@ -534,7 +665,7 @@ direction_impact<-test %>% group_by(feature) %>%
 test<-left_join(tempopo,direction_impact,by="feature")
 
 test_tmp<-test %>% mutate(impact=direction) %>%
-  select(Definition, mean_value,IC_2.5,IC_97.5,impact) %>% 
+  select(feature, mean_value,IC_2.5,IC_97.5,impact) %>% 
   distinct() %>%
   mutate(mean_value=as.numeric(mean_value),
          IC_2.5=as.numeric(IC_2.5),
@@ -553,15 +684,15 @@ ordre_def1<-test_tmp %>% filter(mean_value>=0) %>% arrange(desc(IC_2.5))
 ordre_def2<-test_tmp %>% filter(mean_value<0) %>% arrange(desc(IC_97.5))
 ordre_def<-bind_rows(ordre_def1,ordre_def2)
 
-test_tmp$Definition<-factor(test_tmp$Definition,levels=rev(unique(ordre_def$Definition)))
+test_tmp$feature<-factor(test_tmp$feature,levels=rev(unique(ordre_def$feature)))
 test_tmp$impact<-factor(test_tmp$impact,levels=c("protective factor","neutral","risk factor"),labels=c("protective factor","no impact","risk factor"))
 
 # Plot 1: error bar
-plot1<-ggplot(test_tmp,aes(y=Definition,x=mean_value,col=impact))+
+plot1<-ggplot(test_tmp,aes(y=feature,x=mean_value,col=impact))+
   geom_point()+
   geom_errorbar(aes(xmin = IC_2.5, xmax = IC_97.5))+
   scale_x_continuous("mean |SHAP value|",label=function(x) abs(x))+
-  geom_text(aes(x=IC_97.5,y=Definition,label=abs(IC_97.5)),size=5,position=position_nudge(x = if_else(test_tmp$IC_97.5>=0,0.15,-0.15)))+
+  geom_text(aes(x=IC_97.5,y=feature,label=abs(IC_97.5)),size=5,position=position_nudge(x = if_else(test_tmp$IC_97.5>=0,0.15,-0.15)))+
   scale_y_discrete("")+
   theme_bw()+
   scale_color_manual("Direction:",
@@ -585,11 +716,11 @@ ggsave(plot1,
 
 # Plot 2: barplot
 ordre_def<-test_tmp %>% arrange(desc(mean_value))
-test_tmp$Definition<-factor(test_tmp$Definition,levels=rev(unique(ordre_def$Definition)))
+test_tmp$feature<-factor(test_tmp$feature,levels=rev(unique(ordre_def$feature)))
 
-plot2<-ggplot(test_tmp,aes(y=Definition,x=mean_value,fill=impact))+
+plot2<-ggplot(test_tmp,aes(y=feature,x=mean_value,fill=impact))+
   geom_bar(stat = "identity",col='black')+
-  geom_text(aes(x=mean_value,y=Definition,label=abs(mean_value)),size=6,position=position_nudge(x = if_else(test_tmp$mean_value>=0,0.05,-0.05)))+
+  geom_text(aes(x=mean_value,y=feature,label=abs(mean_value)),size=6,position=position_nudge(x = if_else(test_tmp$mean_value>=0,0.05,-0.05)))+
   scale_x_continuous("mean |SHAP value|",label=function(x) abs(x))+
   scale_y_discrete("")+
   theme_bw()+
