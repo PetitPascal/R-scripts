@@ -151,6 +151,40 @@ comparison_table<-comparison_table %>% arrange(post_prob)
 ## Exporting the results
 write.table(comparison_table,paste("Table_determinants_",Sys.Date(),".csv"),sep=";",col.names=T,row.names=F)
 
+#- - -
+## Model R2
+
+# Extract posterior probabilities of models
+posterior_probs <- bayes2$postprob
+
+# Extract R2 for each model
+r_squared_values <- 1 - (bayes2$deviance / sum((clean_data$outcome - mean(clean_data$outcome))^2))
+
+# Compute Model-Averaged R² = variance explained by models
+R2_BMA <- sum(posterior_probs * r_squared_values)
+R2_BMA
+
+# Compute Prediction-Based R2 = how well BMA predicts real values
+y_pred <- predict(bayes2, type = "response",newdata=clean_data)
+R2_pred <- 1 - sum((clean_data$outcome - y_pred)^2) / sum((clean_data$outcome - mean(clean_data$outcome))^2)
+R2_pred
+
+#- - -
+## Model coefficient
+coefficient<-bayes2$postmean
+coefficient
+
+#- - -
+## Plotting the regression line
+ggplot(data= clean_data, aes(x=y_pred, y=outcome)) +
+  geom_point() +
+  geom_smooth(method="glm",se=T,method.args = list(family = "gaussian"))+
+  annotate(geom="text",label = paste("R^2","==",signif(R2_BMA,3),sep=""),parse = TRUE,x=median(clean_data$outcome,na.rm=T),y=max(clean_data$outcome,na.rm=T))+
+  theme_bw()+
+  scale_x_continuous('Predicted values (BMA)')+
+  scale_y_continuous("Outcome")
+
+#- - -
 ## Plotting BMA results
 plot_df <- comparison_table %>%
   pivot_longer(cols = c(mean_top, mean_top5, mean_BMA),
