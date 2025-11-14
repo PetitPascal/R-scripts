@@ -650,7 +650,7 @@ plot2<-ggplot(test_tmp,aes(y=feature,x=mean_val,fill=impact))+
   geom_text(aes(x=mean_val,y=feature,label=mean_SHAP),size=6,position=position_nudge(x = if_else(test_tmp$mean_val>=0,
                                                                                                  round(max(test_tmp$mean_val,na.rm=T)/10),
                                                                                                  -round(max(test_tmp$mean_val,na.rm=T)/10))))+
-  scale_x_continuous("mean |SHAP value|",label=function(x) abs(x),limits=c(-min(test_tmp$mean_val,na.rm=T),max(test_tmp$mean_val,na.rm=T)+(max(test_tmp$mean_val,na.rm=T)/5)))+
+  scale_x_continuous("mean |SHAP value|",label=function(x) abs(x))+
   scale_y_discrete("")+
   theme_bw()+
   scale_fill_manual("Direction:",
