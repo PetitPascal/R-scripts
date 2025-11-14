@@ -8,7 +8,7 @@ gctorture(FALSE)
 pack_needed<-c("data.table","tidyverse","mllrnrs","broom","doParallel","foreach",
                "splitTools","conflicted","grid","gridExtra","RColorBrewer","mlbench",
                "mlexperiments","caret","MLmetrics","patchwork",
-               "xgboost","parallel")
+               "xgboost","parallel","here")
 for (i in 1:length(pack_needed)){
   if(pack_needed[i]%in%.packages(all.available=TRUE)){
   }else{
@@ -34,6 +34,7 @@ library(caret)
 library(MLmetrics)
 library(xgboost)
 library(patchwork)
+library(here)
 
 ## Preventing package conflicts
 conflict_prefer("select", "dplyr") 
@@ -44,7 +45,7 @@ conflict_prefer("auc", "pROC")
 conflict_prefer("roc", "pROC")
 
 ## Setting the working directory
-setwd("E:/Pascal/Articles/Collab/TED")
+here::here("XGBoost - Binary classification - nested CV")
 
 ## Setting seed
 seed <- 123
@@ -105,32 +106,49 @@ std1 <- function(x){
 ## Function for formatting the display of summary statistics
 test_format<-function(x){
   x<-as.numeric(x)
+  sign_x<-if_else(x<0,"neg","pos")
+  x<-abs(x)
+  x_raw<-x
   
-  if(is.na(x)|x==""|x=="NA"){
+  if(is.na(x)|x==""|x=="NA"|is.infinite(x)){
+    x_raw<-0
+  }
+  
+  if(x_raw>=100){
+    virg_pos<-str_locate(as.character(x_raw),"[.]")[1]
+    
+    if(!is.na(virg_pos)&as.numeric(substr(x_raw,virg_pos+1,virg_pos+1))>=5){
+      x<-x+1
+      x<-as.numeric(substr(x,1,virg_pos-1))
+    }
+    
+  }
+  
+  if(is.na(x)|x==""|x=="NA"|is.infinite(x)){
     x<-""
-    signe<-"pos"
   }else{
-    signe<-if_else(x<0,"neg","pos")
-    x<-abs(x)
     
     if(x<0.01|x>=10000){
       x<-format(signif(x,3),scientific = T)
       
       if(nchar(x)==8&substr(x,4,4)!="e"){
-        if(as.numeric(substr(x,4,4))>=5){
+        if(as.numeric(substr(x,4,4))>=5&x<0.01){
           
           x1<-as.numeric(substr(x,1,4))+0.1
           x2<-substr(x,5,8)
-          x<-paste(substr(x1,1,3),x2,sep="")
+          x<-paste(substr(x1,1,4),x2,sep="")
         }else{
-          x<-paste(substr(x,1,3),substr(x,5,8),sep="")
+          x<-paste(substr(x,1,4),substr(x,5,8),sep="")
         }
       }else{
         x<-x
       }
       
     }else{
+      
+      x_save<-x
       x<-signif(x,3)
+      
       if(nchar(x)==6){
         x<-as.numeric(substr(x,1,5))
       }
@@ -143,23 +161,25 @@ test_format<-function(x){
           x<-substr(x,1,4)
         }
       }else{
-        x<-as.character(x)
+        if(x>=1000){
+          x<-as.character(signif(x_save,4))
+        }else{
+          x<-as.character(x)
+        }
       }
-      
-      if(nchar(x)==3&str_detect(x,"[.]")==T){
-        x<-paste(x,"0",sep="")
-      }
-      
     }
     
   }
   
-  if(signe=="neg"){
+  if(sign_x=="neg"&x_raw!=0){
     x<-paste("-",x,sep="")
   }
   
-  return(x)
+  if(x=="0e+00"){
+    x<-"0"
+  }
   
+  return(x)
 }
 
 # Function for determining the direction (i.e.: how a feature impacts the model)
@@ -210,16 +230,19 @@ determine_direction<-function(df,feature_col,shap_col){
 #----------------------------------------------------------------
 #### Data import and preprocessing ####
 
-## Importing the variable thesaurus
-nomenclature<-as_tibble(read.csv("E:/Pascal/Articles/Collab/TED/nomenclature.csv", sep=";"))
-nomenclature2<-nomenclature
-
 ## Importing the clean dataset
-clean_data<-as_tibble(read.csv2("E:/Pascal/Articles/Collab/TED/TED_01-09-25.csv"))
-clean_data<-clean_data %>% select(-c(ID)) # removing participant ID
+clean_data<-as_tibble(na.omit(survival::colon) %>% filter(etype == 2) %>% select(-c(id,time,study,etype)) %>% mutate(rx=case_when(rx=="Obs"~0,rx=="Lev"~1,T~2)))
+
+## Renaming the outcome variable
+colnames(clean_data)[which(colnames(clean_data)=="status")]<-"outcome"
 clean_data_save<-clean_data
 
-## Reorganising the dataset to ensure TM is the first column
+## Creating a table with the variable type
+var_type_tab<-as_tibble(data.frame(feature=colnames(clean_data),
+                                    Var_type=c("ordered","dichotomous","continuous","dichotomous","dichotomous","dichotomous","continuous","dichotomous",
+                                               "ordered","ordered","dichotomous","dichotomous")))
+
+## Reorganising the dataset to ensure the outcome is the first column
 clean_data<-clean_data %>% select(outcome,colnames(clean_data)[which(colnames(clean_data) %ni% c("outcome"))])
 
 #--------------------------
@@ -231,8 +254,8 @@ feature_cols <- colnames(dataset)[2:ncol(dataset)]
 target_col <- "outcome"
 
 ## Identifying unordered factors
-categorical_var<-nomenclature %>% filter(Variable %in% colnames(clean_data)) %>% 
-                 filter(Var_type %in% c("categorical")) %>% select(Variable) %>% pull
+categorical_var<-var_type_tab %>% filter(feature %in% colnames(clean_data)) %>% 
+                 filter(Var_type %in% c("categorical")) %>% select(feature) %>% pull
 
 ## One-hot encoding of unordered factors
 if (length(categorical_var) > 0) {
@@ -439,10 +462,10 @@ tmp3<-as_tibble(data.frame(Param=names(caret::confusionMatrix(factor(val_pred2),
   pivot_wider(names_from=Param,values_from = Val)
 
 # Adding population information
-n_mal<-clean_data %>% filter(outcome==1) %>% nrow # number of TM users
-n_sain<-clean_data %>% filter(outcome==0) %>% nrow # number of non-TM users
-per_mal<-signif(n_mal/(n_sain+n_mal)*100,3) # % of non-TM users
-per_sain<-signif(n_sain/(n_sain+n_mal)*100,3) # % of non-TM users
+n_mal<-clean_data %>% filter(outcome==1) %>% nrow # number of cases
+n_sain<-clean_data %>% filter(outcome==0) %>% nrow # number of non-cases
+per_mal<-signif(n_mal/(n_sain+n_mal)*100,3) # % of cases
+per_sain<-signif(n_sain/(n_sain+n_mal)*100,3) # % of non-cases
 n_mal<-paste(n_mal," (",per_mal,"%)",sep="")
 n_sain<-paste(n_sain," (",per_sain,"%)",sep="")
 
@@ -549,11 +572,7 @@ tempopo <- left_join(tempopo, shap_tempo, by = c("id", "feature"))
 test_save<-xgb.ggplot.shap.summary(as.matrix(X_test[,xgb_final$feature_names]), contr, model = xgb_final,top_n=25)
 test_save<-as_tibble(test_save$data)
 
-colnames(nomenclature2)[1]<-"feature"
-
-tempopo<-left_join(tempopo,nomenclature2,by=base::intersect(colnames(tempopo),colnames(nomenclature2)))
 tempopo<-left_join(tempopo,Shap_val,by=base::intersect(colnames(tempopo),colnames(Shap_val)))
-Shap_val<-left_join(Shap_val,nomenclature2,by="feature")
 
 test3<-Shap_val %>% arrange(desc(as.numeric(mean_val)))
 
@@ -567,11 +586,10 @@ direction_impact<-tempopo %>% group_by(feature) %>%
 
 test<-left_join(tempopo,direction_impact,by="feature")
 
-test<-left_join(test,nomenclature2,by=base::intersect(colnames(test),colnames(nomenclature2)))
 test<-left_join(test,Shap_val,by=base::intersect(colnames(test),colnames(Shap_val)))
 
 test_tmp<-test %>% mutate(impact=direction) %>%
-  select(Def, mean_val,IC_2.5,IC_97.5,impact,mean_SHAP) %>% 
+  select(feature, mean_val,IC_2.5,IC_97.5,impact,mean_SHAP) %>% 
   distinct() %>%
   mutate(mean_val=as.numeric(mean_val),
          IC_2.5=as.numeric(IC_2.5),
@@ -590,16 +608,16 @@ ordre_def1<-test_tmp %>% filter(mean_val>=0) %>% arrange(desc(IC_2.5))
 ordre_def2<-test_tmp %>% filter(mean_val<0) %>% arrange(desc(IC_97.5))
 ordre_def<-bind_rows(ordre_def1,ordre_def2)
 
-test_tmp$Def<-factor(test_tmp$Def,levels=rev(unique(ordre_def$Def)))
+test_tmp$feature<-factor(test_tmp$feature,levels=rev(unique(ordre_def$feature)))
 test_tmp$impact<-factor(test_tmp$impact,levels=c("limiting factor","neutral","promoting factor"),
                         labels=c("limiting factor","no impact","promoting factor"))
 
 # Plot 1: error bar
-plot1<-ggplot(test_tmp,aes(y=Def,x=mean_val,col=impact))+
+plot1<-ggplot(test_tmp,aes(y=feature,x=mean_val,col=impact))+
   geom_point()+
   geom_errorbar(aes(xmin = IC_2.5, xmax = IC_97.5))+
   scale_x_continuous("mean |SHAP value|",label=function(x) abs(x))+
-  geom_text(aes(x=IC_97.5,y=Def,label=abs(IC_97.5)),size=5,position=position_nudge(x = if_else(test_tmp$IC_97.5>=0,0.15,-0.15)))+
+  geom_text(aes(x=IC_97.5,y=feature,label=abs(IC_97.5)),size=5,position=position_nudge(x = if_else(test_tmp$IC_97.5>=0,0.15,-0.15)))+
   scale_y_discrete("")+
   theme_bw()+
   scale_color_manual("Direction:",
@@ -623,11 +641,11 @@ ggsave(plot1,
 
 # Plot 2: barplot
 ordre_def<-test_tmp %>% arrange(desc(mean_val))
-test_tmp$Def<-factor(test_tmp$Def,levels=rev(unique(ordre_def$Def)))
+test_tmp$feature<-factor(test_tmp$feature,levels=rev(unique(ordre_def$feature)))
 
-plot2<-ggplot(test_tmp,aes(y=Def,x=mean_val,fill=impact))+
+plot2<-ggplot(test_tmp,aes(y=feature,x=mean_val,fill=impact))+
   geom_bar(stat = "identity",col='black')+
-  geom_text(aes(x=mean_val,y=Def,label=mean_SHAP),size=6,position=position_nudge(x = if_else(test_tmp$mean_val>=0,0.2,-0.2)))+
+  geom_text(aes(x=mean_val,y=feature,label=mean_SHAP),size=6,position=position_nudge(x = if_else(test_tmp$mean_val>=0,0.2,-0.2)))+
   scale_x_continuous("mean |SHAP value|",label=function(x) abs(x),limits=c(-0.75,1.25))+
   scale_y_discrete("")+
   theme_bw()+
@@ -660,11 +678,11 @@ test<-test %>% group_by(feature) %>%
   ungroup
 
 test3<-test %>% filter(mean_SHAP!="0")
-ordre_Def<-test3 %>% select(Def,mean_val) %>% distinct %>% mutate(mean_val=as.numeric(mean_val)) %>% arrange(mean_val)
-test3$Def<-factor(test3$Def,level=ordre_Def$Def)
-test2<-test3 %>% select(Def,mean_SHAP) %>% distinct
+ordre_Def<-test3 %>% select(feature,mean_val) %>% distinct %>% mutate(mean_val=as.numeric(mean_val)) %>% arrange(mean_val)
+test3$feature<-factor(test3$feature,level=ordre_Def$feature)
+test2<-test3 %>% select(feature,mean_SHAP) %>% distinct
 
-plot3<-ggplot2::ggplot(test3, ggplot2::aes(x = Def, y = shap_value,colour = feature_value2)) + 
+plot3<-ggplot2::ggplot(test3, ggplot2::aes(x = feature, y = shap_value,colour = feature_value2)) + 
   ggplot2::geom_jitter(width = 0.1) + 
   scale_color_gradientn("Feature value",labels=c("Low", "High"),
                         breaks=c(0,1),
@@ -686,7 +704,7 @@ plot3<-ggplot2::ggplot(test3, ggplot2::aes(x = Def, y = shap_value,colour = feat
   scale_x_discrete("Feature")+
   scale_y_continuous("SHAP value (impact on model output)",limits=c(bornes_shap$min,bornes_shap$max*1.5))+
   ggplot2::coord_flip()+
-  geom_text(data=test2,aes(x = Def, y = bornes_shap$max*1.35,label=mean_SHAP),size=5,col="black")+
+  geom_text(data=test2,aes(x = feature, y = bornes_shap$max*1.35,label=mean_SHAP),size=5,col="black")+
   theme_bw()+
   theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
         strip.background = element_rect(fill=scales::alpha('#009E73', 0.2), colour="black", size=1),
