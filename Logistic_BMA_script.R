@@ -6,7 +6,7 @@ gctorture(FALSE)
 
 ## Installing packages if needed
 pack_needed<-c("data.table","tidyverse","tibble","broom","rstanarm","BayesFactor","bayestestR","glmnet",
-               "BMA","loo","bayesboot","grid","gridExtra","conflicted","usdm","fmsb","RColorBrewer","patchwork")
+               "BMA","loo","bayesboot","grid","gridExtra","conflicted","usdm","fmsb","RColorBrewer","patchwork","here")
 
 for (i in 1:length(pack_needed)){
   if(pack_needed[i]%in%.packages(all.available=TRUE)){
@@ -33,6 +33,7 @@ library(usdm)
 library(fmsb)
 library(RColorBrewer)
 library(patchwork)
+library(here)
 
 ## Preventing package conflicts
 conflict_prefer("select", "dplyr") 
@@ -40,7 +41,7 @@ conflict_prefer("filter", "dplyr")
 conflict_prefer("alpha", "scales")
 
 ## Setting the working directory
-setwd("E:/Pascal/Articles/Collab/TED")
+here::here("Logistic BMA")
 
 #----------------------------------------------------------------
 #### Creating functions ####
@@ -51,13 +52,17 @@ setwd("E:/Pascal/Articles/Collab/TED")
 #----------------------------------------------------------------
 #### Data import ####
 
-## Importing the variable thesaurus
-nomenclature<-as_tibble(read.csv("E:/Pascal/Articles/Collab/TED/nomenclature.csv", sep=";"))
-
 ## Importing the clean dataset
-clean_data<-as_tibble(read.csv2("E:/Pascal/Articles/Collab/TED/TED data_01-09-25.csv"))
-clean_data_save<-clean_data %>% select(-c(ID)) # removing participant ID
-clean_data<-clean_data_save
+clean_data<-as_tibble(na.omit(survival::colon) %>% filter(etype == 2) %>% select(-c(id,time,study,etype)) %>% mutate(rx=case_when(rx=="Obs"~0,rx=="Lev"~1,T~2)))
+
+## Renaming the outcome variable
+colnames(clean_data)[which(colnames(clean_data)=="status")]<-"outcome"
+clean_data_save<-clean_data
+
+## Creating a table with the variable type
+var_type_tab<-as_tibble(data.frame(feature=colnames(clean_data),
+                                    Var_type=c("ordered","dichotomous","continuous","dichotomous","dichotomous","dichotomous","continuous","dichotomous",
+                                               "ordered","ordered","dichotomous","dichotomous")))
 
 #----------------------------------------------------------------
 #### Feature selection ####
@@ -67,13 +72,9 @@ collinear<-usdm::vifstep(as.data.frame(clean_data %>% select(-outcome)),th=2.5)
 clean_data<-clean_data %>% select(colnames(clean_data)[which(colnames(clean_data) %ni% c(collinear@excluded))])
 
 ## Transforming ordinal variables in ordered factors
-clean_data$age <- factor(clean_data$age,levels = sort(unique(clean_data$age)),ordered = TRUE)
-clean_data$TM_know <- factor(clean_data$TM_know,levels = sort(unique(clean_data$TM_know)),ordered = TRUE)
-clean_data$location <- factor(clean_data$location,levels = sort(unique(clean_data$location)),ordered = TRUE)
-clean_data$assess_willing <- factor(clean_data$assess_willing,levels = sort(unique(clean_data$assess_willing)),ordered = TRUE)
-clean_data$TM_course <- factor(clean_data$TM_course,levels = sort(unique(clean_data$TM_course)),ordered = TRUE)
-clean_data$invest <- factor(clean_data$invest,levels = sort(unique(clean_data$invest)),ordered = TRUE)
-clean_data$outcome_perso <- factor(clean_data$outcome_perso,levels = sort(unique(clean_data$outcome_perso)),ordered = TRUE)
+clean_data$rx <- factor(clean_data$rx,levels = sort(unique(clean_data$rx)),ordered = TRUE)
+clean_data$differ <- factor(clean_data$differ,levels = sort(unique(clean_data$differ)),ordered = TRUE)
+clean_data$extent <- factor(clean_data$extent,levels = sort(unique(clean_data$extent)),ordered = TRUE)
 
 ## Regularization methods (LASSO: L1-penalized logistic regression) to do feature selection and shrinkage simultaneously
 
@@ -150,18 +151,13 @@ comparison_table <- bma_full %>%
   left_join(coef_top5 %>% select(feature, mean_top5), by = "feature") %>%
   select(feature, mean_top, mean_top5, mean_BMA, sd_BMA, post_prob)
 
-## Adding the feature full names
-nomenclature2<-nomenclature
-colnames(nomenclature2)[1]<-"Nom"
-colnames(comparison_table)[1]<-"Nom"
-Temp_table<-left_join(comparison_table,nomenclature2,by=c("Nom")) %>% mutate(Nom=Def) %>% arrange(post_prob)
-comparison_table<-Temp_table %>% select(Nom,post_prob)
+comparison_table<-comparison_table %>% arrange(post_prob)
 
 ## Exporting the results
-write.table(Temp_table,paste("Table_determinants_",Sys.Date(),".csv"),sep=";",col.names=T,row.names=F)
+write.table(comparison_table,paste("Table_determinants_",Sys.Date(),".csv"),sep=";",col.names=T,row.names=F)
 
 ## Plotting BMA results
-plot_df <- Temp_table %>%
+plot_df <- comparison_table %>%
   pivot_longer(cols = c(mean_top, mean_top5, mean_BMA),
                names_to = "ModelType",
                values_to = "Coefficient")
@@ -171,10 +167,10 @@ plot_df<-plot_df %>% mutate(ModelType=case_when(ModelType=="mean_top"~"mean top 
                                                 T~"mean BMA"))
 
 plot_df$ModelType<-factor(plot_df$ModelType,levels=c("mean top model","mean BMA","mean top 5 models"))
-plot_df$Nom<-factor(plot_df$Nom,levels=Temp_table$Nom)
+plot_df$feature<-factor(plot_df$feature,levels=comparison_table$feature)
 
 # Plot 1: Coefficient comparison plot
-plot1<-ggplot(plot_df, aes(x = reorder(Nom, Coefficient), y = Coefficient,
+plot1<-ggplot(plot_df, aes(x = feature, y = Coefficient,
                            color = ModelType, shape = ModelType)) +
   geom_point(position = position_dodge(width = 0.6), size = 3) +
   geom_errorbar(aes(ymin = Coefficient - sd_BMA, ymax = Coefficient + sd_BMA),
@@ -199,11 +195,11 @@ plot1<-ggplot(plot_df, aes(x = reorder(Nom, Coefficient), y = Coefficient,
 
 # Plot 2: Inclusion probability barplot
 plot_df2<-plot_df %>% select(-c(ModelType,Coefficient)) %>% distinct
-plot_df2$Nom<-factor(plot_df2$Nom,levels=Temp_table$Nom)
+plot_df2$feature<-factor(plot_df2$feature,levels=comparison_table$feature)
 
-plot2<-ggplot(comparison_table, aes(x = reorder(Nom, post_prob), y = post_prob)) +
+plot2<-ggplot(plot_df2, aes(x = feature, y = post_prob)) +
   geom_col(fill = "steelblue",color="black") +
-  geom_text(aes(x = reorder(Nom, post_prob), y = post_prob+4,label=post_prob),size=6)+
+  geom_text(aes(x = feature, y = post_prob+4,label=post_prob),size=6)+
   scale_y_continuous(expand=c(0,0),limits=c(0,110))+
   coord_flip() +
   labs(x = "", y = "Posterior inclusion probability (%)") +
@@ -217,7 +213,7 @@ plot2<-ggplot(comparison_table, aes(x = reorder(Nom, post_prob), y = post_prob))
         legend.text = element_text(size = 16, face = "bold"),
         axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))  
 
-# COmbining both plots
+# Combining both plots
 plot3<-plot1+plot2
 
 # Exporting plot 3
@@ -229,8 +225,8 @@ ggsave(plot3,
 ## Plotting the radar chart
 
 # Selecting determinants
-BMA_radar<-Temp_table %>% select(Nom) 
-var_select<-nomenclature2 %>% filter(Def %in% BMA_radar$Nom) %>% select(Nom) %>% pull
+BMA_radar<-comparison_table %>% select(feature) 
+var_select<-BMA_radar$feature
 
 # Calculating the proportion for categorical variables or the median of the normalized values for ordinal or continuous variables of each group
 vect_temp<-c()
@@ -238,17 +234,17 @@ vect_temp<-c()
 for(j in 1:length(var_select)){
   
   tempo<-clean_data_save %>% select(outcome,var_select[j])
-  var_type<-nomenclature2 %>% filter(Nom==var_select[j]) %>% select(Var_type) %>% pull
+  var_type<-var_type_tab %>% filter(feature==var_select[j]) %>% select(Var_type) %>% pull
   
   save_col<-colnames(tempo)
-  colnames(tempo)<-c("outcome","Nom")
+  colnames(tempo)<-c("outcome","feature")
   
   if(var_type=="dichotomous"){ # calculating the proportion (percentage between 0 and 100)
     
     n_indiv_tot<-tempo %>% arrange(outcome) %>% group_by(outcome) %>% count %>% ungroup
     colnames(n_indiv_tot)[2]<-"n_tot"
     
-    tempo<-tempo %>% filter(Nom==1)
+    tempo<-tempo %>% filter(feature==1)
     colnames(tempo)<-save_col
     
     tempo<-tempo %>% group_by(outcome) %>% count %>% ungroup
@@ -266,9 +262,9 @@ for(j in 1:length(var_select)){
   }else{ # calculating the median of the normalized values
    
     tempo<-tempo %>%
-           mutate(Nom=(Nom-min(Nom,na.rm=T))/(max(Nom,na.rm=T)-min(Nom,na.rm=T))) %>% # min-max normalization
+           mutate(feature=(feature-min(feature,na.rm=T))/(max(feature,na.rm=T)-min(feature,na.rm=T))) %>% # min-max normalization
            group_by(outcome) %>%
-           mutate(median=median(Nom,na.rm=T)*100) %>%
+           mutate(median=median(feature,na.rm=T)*100) %>%
            ungroup %>%
            select(outcome,median) %>%
            distinct
@@ -283,10 +279,6 @@ for(j in 1:length(var_select)){
   vect_temp<-bind_rows(vect_temp,vect_tempo)
   
 }
-
-# Adding the full name of each variables
-colnames(nomenclature2)[1]<-"Variables"
-vect_temp<-left_join(vect_temp,nomenclature2,by=c("Variables"))
 
 # plotting the radar chart 
 partA<-vect_temp %>% select(Variables,pos) %>% filter(!is.na(Variables)) %>% pivot_wider(names_from=Variables,values_from=pos)
