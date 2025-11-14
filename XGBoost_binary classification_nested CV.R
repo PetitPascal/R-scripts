@@ -617,7 +617,9 @@ plot1<-ggplot(test_tmp,aes(y=feature,x=mean_val,col=impact))+
   geom_point()+
   geom_errorbar(aes(xmin = IC_2.5, xmax = IC_97.5))+
   scale_x_continuous("mean |SHAP value|",label=function(x) abs(x))+
-  geom_text(aes(x=IC_97.5,y=feature,label=abs(IC_97.5)),size=5,position=position_nudge(x = if_else(test_tmp$IC_97.5>=0,0.15,-0.15)))+
+  geom_text(aes(x=IC_97.5,y=feature,label=abs(IC_97.5)),size=5,position=position_nudge(x = if_else(test_tmp$IC_97.5>=0,
+                                                                                                   round(max(test_tmp$IC_97.5,na.rm=T)/10),
+                                                                                                   -round(max(test_tmp$IC_97.5,na.rm=T)/10))))+
   scale_y_discrete("")+
   theme_bw()+
   scale_color_manual("Direction:",
@@ -645,8 +647,10 @@ test_tmp$feature<-factor(test_tmp$feature,levels=rev(unique(ordre_def$feature)))
 
 plot2<-ggplot(test_tmp,aes(y=feature,x=mean_val,fill=impact))+
   geom_bar(stat = "identity",col='black')+
-  geom_text(aes(x=mean_val,y=feature,label=mean_SHAP),size=6,position=position_nudge(x = if_else(test_tmp$mean_val>=0,0.2,-0.2)))+
-  scale_x_continuous("mean |SHAP value|",label=function(x) abs(x),limits=c(-0.75,1.25))+
+  geom_text(aes(x=mean_val,y=feature,label=mean_SHAP),size=6,position=position_nudge(x = if_else(test_tmp$mean_val>=0,
+                                                                                                 round(max(test_tmp$mean_val,na.rm=T)/10),
+                                                                                                 -round(max(test_tmp$mean_val,na.rm=T)/10))))+
+  scale_x_continuous("mean |SHAP value|",label=function(x) abs(x),limits=c(-min(test_tmp$mean_val,na.rm=T),max(test_tmp$mean_val,na.rm=T)+(max(test_tmp$mean_val,na.rm=T)/5)))+
   scale_y_discrete("")+
   theme_bw()+
   scale_fill_manual("Direction:",
