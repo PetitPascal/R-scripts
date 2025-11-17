@@ -107,6 +107,9 @@ set.seed(12345)
 bayes2<-bic.glm(feature_list,outcome,glm.family="gaussian")
 summary(bayes2)
 
+## Saving the model
+saveRDS(bayes2, file = "BMA_model.rds")
+
 ## Table with determinants identified
 
 # Extracting full BMA coefficients
