@@ -425,6 +425,9 @@ xgb_final <- xgboost::xgb.train(
   verbose = 1
 )
 
+# Saving the final model
+saveRDS(xgb_final, file = "XGBoost_model.rds")
+                            
 #--------------------------
 ## Final evaluation on holdout test dataset
 
