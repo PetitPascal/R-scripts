@@ -410,6 +410,9 @@ final_mod<-final_model$fit(
   max_depth = best_params$max_depth
 )
 
+# Saving the final model
+saveRDS(final_mod, file = "XGBoost_model.rds")
+
 # Predicting on training and test sets
 preds_train_final <- predict(final_mod, xgboost::xgb.DMatrix(data = as.matrix(train_x)))
 preds_test_final <- predict(final_mod, xgboost::xgb.DMatrix(data = as.matrix(test_x)))
@@ -769,4 +772,5 @@ fwrite(test_tmp,paste("test_tmp_",Sys.Date(),".csv",sep=""), sep = ";", row.name
 fwrite(test,paste("test_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
 fwrite(shap,paste("shap_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
 fwrite(shap_score_sub,paste("shap_score_sub_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
+
 
