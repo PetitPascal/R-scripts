@@ -256,32 +256,26 @@ test_mod3 <- r_to_py(as.matrix(data_bp_test %>% select(-id))) # model 3
 
 # model 1
 prediction_mod1 <- mod1$predict(test_mod1)
-colnames(prediction_mod1)<-c("beta_pred_I","S0_pred_I","mu_pred_I")
-results_mod1<-as_tibble(data.frame(model="Model 1",
-                                   S=data_test_SIR_save %>% select(S) %>% pull,
-                                   I=data_test_SIR_save %>% select(I) %>% pull,
-                                   R=data_test_SIR_save %>% select(R) %>% pull,
-                                   time=data_test_SIR_save %>% select(time),
-                                   prediction_mod1))
+colnames(prediction_mod1)<-c("beta","S0","mu")
+results_mod1<-as_tibble(data.frame(prediction_mod1,
+                                   I=data_test_SIR %>% select(-id)))
 results_mod1
 
 # model 2
 prediction_mod2 <- mod2$predict(test_mod2)
 colnames(prediction_mod2)<-c("exposure_A","exposure_B")
 
-results_mod2<-as_tibble(data.frame(model="Model 2",
-                                   age=data_expo_test %>% select(age) %>% pull,
+results_mod2<-as_tibble(data.frame(age=data_expo_test %>% select(age) %>% pull,
                                    BMI=data_expo_test %>% select(BMI) %>% pull,
                                    activity=data_expo_test %>% select(activity) %>% pull,
                                    prediction_mod2))
 results_mod2
 
-# model 2
+# model 3
 prediction_mod3 <- mod3$predict(test_mod3)
 colnames(prediction_mod3)<-c("systolic_BP","diastolic_BP","cholesterol")
 
-results_mod3<-as_tibble(data.frame(model="Model 3",
-                                   age=data_bp_test %>% select(age) %>% pull,
+results_mod3<-as_tibble(data.frame(age=data_bp_test %>% select(age) %>% pull,
                                    BMI=data_bp_test %>% select(BMI) %>% pull,
                                    activity=data_bp_test %>% select(activity) %>% pull,
                                    prediction_mod3))
