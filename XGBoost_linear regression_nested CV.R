@@ -211,24 +211,22 @@ determine_direction <- function(df, feature_col, shap_col, majority_threshold = 
   ## Continuous / ordered feature
   
   # Pairwise comparison approach (generalization of Mann-Whitney)
-  x<-x_sub
-  s<-s_sub
-  
+
   # All pairs where feature_i > feature_j
   pos_count <- 0
   neg_count <- 0
   total_count <- 0
   
-  for(i in 1:(length(x_sub)-1)) {
-    for(j in (i+1):length(x_sub)) {
-      if(x_sub[i] > x_sub[j]) {
+  for(i in 1:(length(x)-1)) {
+    for(j in (i+1):length(x)) {
+      if(x[i] > x[j]) {
         total_count <- total_count + 1
-        if(s_sub[i] > s_sub[j]) pos_count <- pos_count + 1
-        if(s_sub[i] < s_sub[j]) neg_count <- neg_count + 1
-      } else if(x_sub[j] > x_sub[i]) {
+        if(s[i] > s[j]) pos_count <- pos_count + 1
+        if(s[i] < s[j]) neg_count <- neg_count + 1
+      } else if(x[j] > x[i]) {
         total_count <- total_count + 1
-        if(s_sub[j] > s_sub[i]) pos_count <- pos_count + 1
-        if(s_sub[j] < s_sub[i]) neg_count <- neg_count + 1
+        if(s[j] > s[i]) pos_count <- pos_count + 1
+        if(s[j] < s[i]) neg_count <- neg_count + 1
       }
     }
   }
