@@ -104,7 +104,7 @@ test_format<-function(x){
     x<-""
   }else{
     
-    if(x<0.01|x>=10000){
+    if(x<0.05|x>=10000){
       x<-format(signif(x,3),scientific = T)
       
       if(nchar(x)==8&substr(x,4,4)!="e"){
@@ -185,7 +185,7 @@ determine_direction<-function(df,feature_col,shap_col){
   if(length(unique(x))<=2||quantile(x,0.75)==0){
     mean_diff<-mean(s[x>0],na.rm=T)-mean(s[x<=0],na.rm=T)
     
-    return(ifelse(mean_diff>0,'risk factor',ifelse(mean_diff<0,"protective factor","neutral")))
+    return(ifelse(mean_diff>0,'promoting predictor',ifelse(mean_diff<0,"mitigating predictor","neutral")))
   }
   
   # for cases when the feature is continuous
@@ -194,14 +194,14 @@ determine_direction<-function(df,feature_col,shap_col){
     derivs<-derivatives(gam_model, term='s(x)')
     mean_deriv<-mean(derivs$derivative,na.rm=T)
     
-    return(ifelse(mean_deriv>0,'risk factor',ifelse(mean_deriv<0,"protective factor","neutral")))
+    return(ifelse(mean_deriv>0,'promoting predictor',ifelse(mean_deriv<0,"mitigating predictor","neutral")))
   }, error=function(e){
     
     # if GAM fails, Spearman correlation is computed
     rho<-suppressWarnings(cor(x,s,method="spearman"))
     if(is.na(rho)) return("undefined")
     if(abs(rho)<0.05) return("neutral")
-    return(ifelse(rho>0,"risk factor","protective factor"))
+    return(ifelse(rho>0,"promoting predictor","mitigating predictor"))
   }
   )
 }
@@ -423,6 +423,36 @@ c_index_test_final  <- c_index(predictions = preds_test_final,  ground_truth = t
 
 #----------------------------------------------------------------
 #### Cox model evaluation ####
+
+#- - - - - - - - - -
+## Univariate Cox model on the test dataset
+
+var_test<-colnames(test_x)
+
+Cox_tab_res<-c()
+
+for(n_var in 1:length(var_test)){
+  
+  test_tmpo<-as_tibble(test_x) %>% select(which(colnames(test_x)==var_test[n_var]))
+  colnames(test_tmpo)<-"tmp"
+  test_tmpo<-bind_cols(test_y,test_tmpo)
+  
+  cox_model<-coxph(Surv(time, status) ~ tmp, data = test_tmpo)
+  mod_res<-broom::tidy(cox_model,exponentiate=T,conf.int=T) %>%
+           mutate(term=var_test[n_var],
+                  direction=case_when(conf.low>1~"positive association",
+                                      conf.high<1~"negative association",
+                                      T~"uncertain association")) %>% 
+           bind_cols(broom::glance(cox_model)) %>%
+           rowwise %>% 
+           mutate_if(is.numeric,test_format) %>%
+           ungroup %>%
+           mutate(HR=paste(estimate," [",conf.low,"; ",conf.high,"]",sep="")) %>%
+           mutate(HR=if_else(HR==" [; ]","",HR))
+
+  Cox_tab_res<-bind_rows(Cox_tab_res,mod_res)
+  
+}
 
 #- - - - - - - - - -
 ## Grouping individuals into groups
@@ -673,9 +703,9 @@ test_tmp<-test %>% mutate(impact=direction) %>%
   mutate(mean_value=as.numeric(mean_value),
          IC_2.5=as.numeric(IC_2.5),
          IC_97.5=as.numeric(IC_97.5)) %>%
-  mutate(mean_value=if_else(impact=="protective factor",-mean_value,mean_value),
-         IC_2.5=if_else(impact=="protective factor",-IC_2.5,IC_2.5),
-         IC_97.5=if_else(impact=="protective factor",-IC_97.5,IC_97.5))
+  mutate(mean_value=if_else(impact=="mitigating predictor",-mean_value,mean_value),
+         IC_2.5=if_else(impact=="mitigating predictor",-IC_2.5,IC_2.5),
+         IC_97.5=if_else(impact=="mitigating predictor",-IC_97.5,IC_97.5))
 
 test_tmp<-test_tmp %>% arrange(desc(mean_value)) %>% filter(mean_value!=0)
 
@@ -688,16 +718,14 @@ ordre_def2<-test_tmp %>% filter(mean_value<0) %>% arrange(desc(IC_97.5))
 ordre_def<-bind_rows(ordre_def1,ordre_def2)
 
 test_tmp$feature<-factor(test_tmp$feature,levels=rev(unique(ordre_def$feature)))
-test_tmp$impact<-factor(test_tmp$impact,levels=c("protective factor","neutral","risk factor"),labels=c("protective factor","no impact","risk factor"))
+test_tmp$impact<-factor(test_tmp$impact,levels=c("mitigating predictor","neutral","promoting predictor"),labels=c("mitigating predictor","no impact","promoting predictor"))
 
 # Plot 1: error bar
 plot1<-ggplot(test_tmp,aes(y=feature,x=mean_value,col=impact))+
   geom_point()+
   geom_errorbar(aes(xmin = IC_2.5, xmax = IC_97.5))+
   scale_x_continuous("mean |SHAP value|",label=function(x) abs(x))+
-  geom_text(aes(x=IC_97.5,y=feature,label=abs(IC_97.5)),size=5,position=position_nudge(x = if_else(test_tmp$IC_97.5>=0,
-                                                                                                   round(max(test_tmp$IC_97.5,na.rm=T)/10),
-                                                                                                   -round(max(test_tmp$IC_97.5,na.rm=T)/10))))+
+  geom_text(aes(x=IC_97.5,y=feature,label=abs(IC_97.5)),size=5,position=position_nudge(x = if_else(test_tmp$IC_97.5>=0,0.15,-0.15)))+
   scale_y_discrete("")+
   theme_bw()+
   scale_color_manual("Direction:",
@@ -725,9 +753,7 @@ test_tmp$feature<-factor(test_tmp$feature,levels=rev(unique(ordre_def$feature)))
 
 plot2<-ggplot(test_tmp,aes(y=feature,x=mean_value,fill=impact))+
   geom_bar(stat = "identity",col='black')+
-  geom_text(aes(x=mean_val,y=feature,label=mean_SHAP),size=6,position=position_nudge(x = if_else(test_tmp$mean_val>=0,
-                                                                                                 round(max(test_tmp$mean_val,na.rm=T)/10),
-                                                                                                 -round(max(test_tmp$mean_val,na.rm=T)/10))))+
+  geom_text(aes(x=mean_value,y=feature,label=abs(mean_value)),size=6,position=position_nudge(x = if_else(test_tmp$mean_value>=0,0.05,-0.05)))+
   scale_x_continuous("mean |SHAP value|",label=function(x) abs(x))+
   scale_y_discrete("")+
   theme_bw()+
@@ -749,6 +775,19 @@ ggsave(plot2,
                   Sys.Date(),".pdf",sep=""),
        dpi=600,width=60,height=30,units = "cm",limitsize=F)
 
+#- - - - - - - - - -
+## SHAP and Cox comparison
+
+tmp_Cox<-Cox_tab_res %>% select(term,HR,direction,concordance,p.value.log)
+colnames(tmp_Cox)<-c("feature","HR [95% CI]","Cox - association direction","Cox - C-index","Cox - LR p-value")
+
+tmp_SHAP<-test %>% select(feature,mean_SHAP,direction,mean_value) %>% distinct %>% 
+  arrange(desc(abs(as.numeric(mean_value)))) %>% select(-mean_value)
+
+colnames(tmp_SHAP)<-c("feature","mean |SHAP| value [95% CI]","SHAP direction")
+
+Compa_Cox_SHAP<-left_join(tmp_SHAP,tmp_Cox,by="feature")
+
 #----------------------------------------------------------------
 #### Saving results
 
@@ -763,6 +802,9 @@ fwrite(perf_xgboost,paste("perf_xgboost_",Sys.Date(),".csv",sep=""), sep = ";", 
 fwrite(as_tibble(c_index_train_final),paste("c_index_train_final_mod_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE) # c index final model on training set
 fwrite(as_tibble(c_index_test_final),paste("c_index_test_final_mod_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE) # c index final model on test set
 
+# Univariate Cox regression
+fwrite(Cox_tab_res,paste("Univariate Cox regression_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+
 # Feature importance
 fwrite(importance_matrix,paste("importance_matrix_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
 
@@ -773,4 +815,5 @@ fwrite(test,paste("test_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
 fwrite(shap,paste("shap_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
 fwrite(shap_score_sub,paste("shap_score_sub_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
 
-
+# SHAP and Cox comparison
+fwrite(Compa_Cox_SHAP,paste("Compa_Cox_SHAP_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
