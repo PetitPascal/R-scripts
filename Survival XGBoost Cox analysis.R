@@ -165,45 +165,42 @@ normalize_custom <- function(x, new_min, new_max) {
 }
 
 ## Function for determining the feature direction effect (i.e.: how a feature impacts the model)
-determine_direction<-function(df,feature_col,shap_col){
+determine_shap_direction <- function(df, feature_col, shap_col, n_bins = 10, prop_threshold = 0.55) {
   
-  # extracting vectors
-  x<-df[[feature_col]]
-  s<-df[[shap_col]]
+  # Extracting feature and SHAP vector values
+  x <- df[[feature_col]]
+  s <- df[[shap_col]]
   
-  # removing NA
-  valid<-complete.cases(x,s)
-  x<-x[valid]
-  s<-s[valid]
+  # Removing NAs
+  valid <- complete.cases(x, s)
+  x <- x[valid]
+  s <- s[valid]
   
-  # for cases when all values are identical
-  if(length(unique(x))<=1||length(unique(s))<=1){
-    return("undefined")
+  # Handling constant features
+  if(length(unique(x)) <= 1 || length(unique(s)) <= 1) return("undefined")
+  
+  # Binary or sparse features
+  if(length(unique(x)) <= 2) {
+    prop_positive <- mean(s[x > 0] > 0, na.rm = TRUE)
+    prop_negative <- mean(s[x > 0] < 0, na.rm = TRUE)
+    if(prop_positive >= prop_threshold) return("promoting predictor")
+    if(prop_negative >= prop_threshold) return("mitigating predictor")
+    return("neutral")
   }
   
-  # for cases when the feature is binary or sparse
-  if(length(unique(x))<=2||quantile(x,0.75)==0){
-    mean_diff<-mean(s[x>0],na.rm=T)-mean(s[x<=0],na.rm=T)
-    
-    return(ifelse(mean_diff>0,'promoting predictor',ifelse(mean_diff<0,"mitigating predictor","neutral")))
-  }
+  # Continuous features: binning into quantiles
+  bins <- cut(x, breaks = quantile(x, probs = seq(0,1,length.out = n_bins+1), na.rm = TRUE),
+              include.lowest = TRUE, labels = FALSE)
   
-  # for cases when the feature is continuous
-  tryCatch({
-    gam_model<-gam(s~s(x), method='REML')
-    derivs<-derivatives(gam_model, term='s(x)')
-    mean_deriv<-mean(derivs$derivative,na.rm=T)
-    
-    return(ifelse(mean_deriv>0,'promoting predictor',ifelse(mean_deriv<0,"mitigating predictor","neutral")))
-  }, error=function(e){
-    
-    # if GAM fails, Spearman correlation is computed
-    rho<-suppressWarnings(cor(x,s,method="spearman"))
-    if(is.na(rho)) return("undefined")
-    if(abs(rho)<0.05) return("neutral")
-    return(ifelse(rho>0,"promoting predictor","mitigating predictor"))
-  }
-  )
+  bin_means <- tapply(s, bins, mean, na.rm = TRUE)
+  
+  # Computing overall trend across bins
+  slope <- lm(bin_means ~ seq_along(bin_means))$coefficients[2]
+  
+  # Assigning direction based on slope
+  if(slope > 0) return("promoting predictor")
+  if(slope < 0) return("mitigating predictor")
+  return("neutral")
 }
 
 #----------------------------------------------------------------
@@ -817,3 +814,4 @@ fwrite(shap_score_sub,paste("shap_score_sub_",Sys.Date(),".txt",sep=""), sep = "
 
 # SHAP and Cox comparison
 fwrite(Compa_Cox_SHAP,paste("Compa_Cox_SHAP_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+
