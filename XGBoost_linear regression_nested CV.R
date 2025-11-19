@@ -7,7 +7,7 @@ gctorture(FALSE)
 ## Installing packages if needed
 pack_needed<-c("data.table","tidyverse","mllrnrs","broom","doParallel","foreach",
                "splitTools","conflicted","grid","gridExtra","RColorBrewer","mlbench",
-               "mlexperiments","caret","MLmetrics","patchwork",
+               "mlexperiments","caret","MLmetrics","patchwork","CardioDataSets","performance",
                "xgboost","parallel","here")
 for (i in 1:length(pack_needed)){
   if(pack_needed[i]%in%.packages(all.available=TRUE)){
@@ -128,7 +128,7 @@ test_format<-function(x){
     x<-""
   }else{
     
-    if(x<0.01|x>=10000){
+    if(x<0.05|x>=10000){
       x<-format(signif(x,3),scientific = T)
       
       if(nchar(x)==8&substr(x,4,4)!="e"){
@@ -184,64 +184,64 @@ test_format<-function(x){
 
 # Function for determining the direction (i.e.: how a feature impacts the model)
 determine_direction <- function(df, feature_col, shap_col, majority_threshold = 0.55) {
-    
-    x <- df[[feature_col]]
-    s <- df[[shap_col]]
-    
-    ## Removing missing values
-    valid <- complete.cases(x, s)
-    x <- x[valid]
-    s <- s[valid]
-    
-    ## If feature or SHAP has no variation
-    if(length(unique(x)) <= 1 || length(unique(s)) <= 1) return("undefined")
-    
-    ## Binary / sparse feature (0/1 or very few unique values)
-    if(length(unique(x)) <= 2 || quantile(x, 0.75) == 0) {
-      group0 <- s[x == min(x)]
-      group1 <- s[x == max(x)]
-      n_pos <- sum(outer(group1, group0, FUN = ">"))
-      n_total <- length(group1) * length(group0)
-      prop <- n_pos / n_total
-      if(prop >= majority_threshold) return("promoting predictor")
-      if(prop <= (1 - majority_threshold)) return("mitigating predictor")
-      return("neutral")
-    }
-    
-    ## Continuous / ordered feature
-    
-    # Pairwise comparison approach (generalization of Mann-Whitney)
-    x<-x_sub
-    s<-s_sub
-    
-    # All pairs where feature_i > feature_j
-    pos_count <- 0
-    neg_count <- 0
-    total_count <- 0
-    
-    for(i in 1:(length(x_sub)-1)) {
-      for(j in (i+1):length(x_sub)) {
-        if(x_sub[i] > x_sub[j]) {
-          total_count <- total_count + 1
-          if(s_sub[i] > s_sub[j]) pos_count <- pos_count + 1
-          if(s_sub[i] < s_sub[j]) neg_count <- neg_count + 1
-        } else if(x_sub[j] > x_sub[i]) {
-          total_count <- total_count + 1
-          if(s_sub[j] > s_sub[i]) pos_count <- pos_count + 1
-          if(s_sub[j] < s_sub[i]) neg_count <- neg_count + 1
-        }
-      }
-    }
-    
-    if(total_count == 0) return("neutral")
-    
-    prop_pos <- pos_count / total_count
-    prop_neg <- neg_count / total_count
-    
-    if(prop_pos >= majority_threshold) return("promoting predictor")
-    if(prop_neg >= majority_threshold) return("mitigating predictor")
+  
+  x <- df[[feature_col]]
+  s <- df[[shap_col]]
+  
+  ## Removing missing values
+  valid <- complete.cases(x, s)
+  x <- x[valid]
+  s <- s[valid]
+  
+  ## If feature or SHAP has no variation
+  if(length(unique(x)) <= 1 || length(unique(s)) <= 1) return("undefined")
+  
+  ## Binary / sparse feature (0/1 or very few unique values)
+  if(length(unique(x)) <= 2 || quantile(x, 0.75) == 0) {
+    group0 <- s[x == min(x)]
+    group1 <- s[x == max(x)]
+    n_pos <- sum(outer(group1, group0, FUN = ">"))
+    n_total <- length(group1) * length(group0)
+    prop <- n_pos / n_total
+    if(prop >= majority_threshold) return("promoting predictor")
+    if(prop <= (1 - majority_threshold)) return("mitigating predictor")
     return("neutral")
   }
+  
+  ## Continuous / ordered feature
+  
+  # Pairwise comparison approach (generalization of Mann-Whitney)
+  x<-x_sub
+  s<-s_sub
+  
+  # All pairs where feature_i > feature_j
+  pos_count <- 0
+  neg_count <- 0
+  total_count <- 0
+  
+  for(i in 1:(length(x_sub)-1)) {
+    for(j in (i+1):length(x_sub)) {
+      if(x_sub[i] > x_sub[j]) {
+        total_count <- total_count + 1
+        if(s_sub[i] > s_sub[j]) pos_count <- pos_count + 1
+        if(s_sub[i] < s_sub[j]) neg_count <- neg_count + 1
+      } else if(x_sub[j] > x_sub[i]) {
+        total_count <- total_count + 1
+        if(s_sub[j] > s_sub[i]) pos_count <- pos_count + 1
+        if(s_sub[j] < s_sub[i]) neg_count <- neg_count + 1
+      }
+    }
+  }
+  
+  if(total_count == 0) return("neutral")
+  
+  prop_pos <- pos_count / total_count
+  prop_neg <- neg_count / total_count
+  
+  if(prop_pos >= majority_threshold) return("promoting predictor")
+  if(prop_neg >= majority_threshold) return("mitigating predictor")
+  return("neutral")
+}
 
 ## not including function (opposite function of %in%)
 `%ni%`<-Negate('%in%')
@@ -447,7 +447,7 @@ xgb_final <- xgboost::xgb.train(
 
 # Saving the final model
 saveRDS(xgb_final, file = "XGBoost_model.rds")
-                            
+
 #--------------------------
 ## Final evaluation on holdout test dataset
 
@@ -471,6 +471,38 @@ Mod_charact<-as_tibble(data.frame(R2=R2,
 write.table(outer_summary,paste("CV summary table_",Sys.Date(),".csv"),sep=";",col.names=T,row.names=F)
 write.table(Mod_charact,paste("Model characteristics_",Sys.Date(),".csv"),sep=";",col.names=T,row.names=F)
 write.table(as_tibble(final_params),paste("Best hyperparameters_",Sys.Date(),".csv"),sep=";",col.names=T,row.names=F)
+
+#----------------------------------------------------------------
+#### Univariate association analysis ####
+
+var_test<-colnames(X_test)
+
+Association_tab_res<-c()
+
+for(n_var in 1:length(var_test)){
+  
+  test_tmpo<-as_tibble(X_test) %>% select(which(colnames(X_test)==var_test[n_var]))
+  colnames(test_tmpo)<-"tmp"
+  test_tmpo<-bind_cols(y_test,test_tmpo)
+  colnames(test_tmpo)[1]<-"outcome"
+  
+  glm_model<-glm(outcome ~ tmp, data = test_tmpo,family="gaussian")
+  mod_res<-broom::tidy(glm_model,exponentiate=F,conf.int=T) %>%
+    filter(term!="(Intercept)") %>%
+    mutate(term=var_test[n_var],
+           direction=case_when(conf.low>=0~"positive association",
+                               conf.high<0~"negative association",
+                               T~"uncertain association")) %>% 
+    bind_cols(performance::performance(glm_model)) %>%
+    rowwise %>% 
+    mutate_if(is.numeric,test_format) %>%
+    ungroup %>%
+    mutate(beta=paste(estimate," [",conf.low,"; ",conf.high,"]",sep="")) %>%
+    mutate(beta=if_else(beta==" [; ]","",beta))
+  
+  Association_tab_res<-bind_rows(Association_tab_res,mod_res)
+  
+}
 
 #----------------------------------------------------------------
 #### SHAP analysis ####
@@ -700,6 +732,25 @@ ggsave(plot3,
                   Sys.Date(),".pdf",sep=""),
        dpi=600,width=60,height=30,units = "cm",limitsize=F)
 
+#- - - - - - - - - -
+## SHAP and GLM comparison
+
+tmp_GLM<-Association_tab_res %>% select(term,beta,direction,R2,p.value)
+colnames(tmp_GLM)<-c("feature","Beta [95% CI]","GLM - association direction","GLM - R2","GLM -p-value")
+
+test_SHAP_tmp<-test %>%  
+  select(feature,mean_SHAP,direction,mean_val) %>% 
+  distinct %>%
+  arrange(desc(abs(as.numeric(mean_val)))) %>%
+  rowwise %>%
+  mutate_if(is.numeric,test_format) %>%
+  ungroup %>%
+  select(-c(mean_val))
+
+colnames(test_SHAP_tmp)<-c("feature","mean_abs_SHAP [95% CI]","SHAP direction")
+
+Compa_GLM_SHAP<-left_join(test_SHAP_tmp,tmp_GLM,by="feature")
+
 #----------------------------------------------------------------
 #### Saving SHAP results
 
@@ -709,3 +760,5 @@ fwrite(test_tmp,paste("test_tmp_",Sys.Date(),".csv",sep=""), sep = ";", row.name
 fwrite(test,paste("test_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
 fwrite(shap,paste("shap_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
 fwrite(shap_score_sub,paste("shap_score_sub_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
+fwrite(Association_tab_res,paste("Univariate Cox regression_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+fwrite(Compa_GLM_SHAP,paste("Compa_GLM_SHAP_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
