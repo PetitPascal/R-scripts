@@ -165,64 +165,70 @@ normalize_custom <- function(x, new_min, new_max) {
 }
 
 ## Function for determining the feature direction effect (i.e.: how a feature impacts the model)
-determine_direction <- function(df, feature_col, shap_col,
-                                     majority_threshold = 0.55,
-                                     n_grid = 100,
-                                     gam_k = 10) {
-  x <- df[[feature_col]]
-  s <- df[[shap_col]]
-  
-  # Removing missing values
-  valid <- complete.cases(x, s)
-  x <- x[valid]; s <- s[valid]
-  
-  # For cases when all values are identical
-  if(length(unique(x)) <= 1 || length(unique(s)) <= 1) return("undefined")
-
-  # Binary or sparse feature
-  if(length(unique(x)) <= 2) {
-    group0 <- s[x == min(x)]
-    group1 <- s[x == max(x)]
-    n_pos <- sum(outer(group1, group0, FUN = ">")) # counting pairs where SHAP(group1) > SHAP(group0)
-    n_total <- length(group1) * length(group0)
-    prop <- n_pos / n_total
+determine_direction <- function(df, feature_col, shap_col, majority_threshold = 0.55) {
     
-    if(prop >= majority_threshold) return("promoting predictor")
-    if(prop <= (1 - majority_threshold)) return("mitigating predictor")
+    x <- df[[feature_col]]
+    s <- df[[shap_col]]
+    
+    ## Removing missing values
+    valid <- complete.cases(x, s)
+    x <- x[valid]
+    s <- s[valid]
+    
+    ## If feature or SHAP has no variation
+    if(length(unique(x)) <= 1 || length(unique(s)) <= 1) return("undefined")
+    
+    ## Binary / sparse feature (0/1 or very few unique values)
+    if(length(unique(x)) <= 2 || quantile(x, 0.75) == 0) {
+      group0 <- s[x == min(x)]
+      group1 <- s[x == max(x)]
+      n_pos <- sum(outer(group1, group0, FUN = ">"))
+      n_total <- length(group1) * length(group0)
+      prop <- n_pos / n_total
+      if(prop >= majority_threshold) return("promoting predictor")
+      if(prop <= (1 - majority_threshold)) return("mitigating predictor")
+      return("neutral")
+    }
+    
+    ## Continuous / ordered feature
+    
+    # Pairwise comparison approach (generalization of Mann-Whitney)
+    n <- length(x)
+    if(n > 1e6) {  # avoiding huge O(n^2) computation: sample pairs
+      idx <- sample(n, 1e6)
+      x_sub <- x[idx]; s_sub <- s[idx]
+    } else {
+      x_sub <- x; s_sub <- s
+    }
+    
+    # All pairs where feature_i > feature_j
+    pos_count <- 0
+    neg_count <- 0
+    total_count <- 0
+    
+    for(i in 1:(length(x_sub)-1)) {
+      for(j in (i+1):length(x_sub)) {
+        if(x_sub[i] > x_sub[j]) {
+          total_count <- total_count + 1
+          if(s_sub[i] > s_sub[j]) pos_count <- pos_count + 1
+          if(s_sub[i] < s_sub[j]) neg_count <- neg_count + 1
+        } else if(x_sub[j] > x_sub[i]) {
+          total_count <- total_count + 1
+          if(s_sub[j] > s_sub[i]) pos_count <- pos_count + 1
+          if(s_sub[j] < s_sub[i]) neg_count <- neg_count + 1
+        }
+      }
+    }
+    
+    if(total_count == 0) return("neutral")
+    
+    prop_pos <- pos_count / total_count
+    prop_neg <- neg_count / total_count
+    
+    if(prop_pos >= majority_threshold) return("promoting predictor")
+    if(prop_neg >= majority_threshold) return("mitigating predictor")
     return("neutral")
   }
-  
-  # Continuous / ordered feature
-  try({ # Fitting GAM first
-    gam_fit <- gam(s ~ s(x, k = gam_k), method = "REML")
-    x_grid <- seq(min(x), max(x), length.out = n_grid)
-    s_pred <- predict(gam_fit, newdata = data.frame(x = x_grid))
-    slopes <- diff(s_pred)
-  }, silent = TRUE)
-  
-  if(!exists("slopes") || all(is.na(slopes))) { # If GAM fails, fallback to LOESS
-    loess_fit <- loess(s ~ x, span = 0.5)
-    x_grid <- seq(min(x), max(x), length.out = n_grid)
-    s_pred <- predict(loess_fit, newdata = data.frame(x = x_grid))
-    slopes <- diff(s_pred)
-  }
-  
-  # If slope still cannot be computed - Spearman correlation
-  if(is.null(slopes) || all(is.na(slopes))){
-    rho<-suppressWarnings(cor(x,s,method="spearman"))
-    if(is.na(rho)) return("undefined")
-    if(abs(rho)<0.05) return("neutral")
-    return(ifelse(rho>0,"promoting predictor","mitigating predictor"))
-  }
-  
-  # Aggregating slope signs
-  prop_pos <- mean(slopes > 0, na.rm = TRUE)
-  prop_neg <- mean(slopes < 0, na.rm = TRUE)
-  
-  if(prop_pos >= majority_threshold) return("promoting predictor")
-  if(prop_neg >= majority_threshold) return("mitigating predictor")
-  return("neutral")
-}
 
 #----------------------------------------------------------------
 #### Data import and preprocessing ####
@@ -835,6 +841,7 @@ fwrite(shap_score_sub,paste("shap_score_sub_",Sys.Date(),".txt",sep=""), sep = "
 
 # SHAP and Cox comparison
 fwrite(Compa_Cox_SHAP,paste("Compa_Cox_SHAP_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+
 
 
 
