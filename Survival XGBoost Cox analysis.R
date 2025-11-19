@@ -166,64 +166,62 @@ normalize_custom <- function(x, new_min, new_max) {
 
 ## Function for determining the feature direction effect (i.e.: how a feature impacts the model)
 determine_direction <- function(df, feature_col, shap_col, majority_threshold = 0.55) {
-    
-    x <- df[[feature_col]]
-    s <- df[[shap_col]]
-    
-    ## Removing missing values
-    valid <- complete.cases(x, s)
-    x <- x[valid]
-    s <- s[valid]
-    
-    ## If feature or SHAP has no variation
-    if(length(unique(x)) <= 1 || length(unique(s)) <= 1) return("undefined")
-    
-    ## Binary / sparse feature (0/1 or very few unique values)
-    if(length(unique(x)) <= 2 || quantile(x, 0.75) == 0) {
-      group0 <- s[x == min(x)]
-      group1 <- s[x == max(x)]
-      n_pos <- sum(outer(group1, group0, FUN = ">"))
-      n_total <- length(group1) * length(group0)
-      prop <- n_pos / n_total
-      if(prop >= majority_threshold) return("promoting predictor")
-      if(prop <= (1 - majority_threshold)) return("mitigating predictor")
-      return("neutral")
-    }
-    
-    ## Continuous / ordered feature
-    
-    # Pairwise comparison approach (generalization of Mann-Whitney)
-    x<-x_sub
-    s<-s_sub
-    
-    # All pairs where feature_i > feature_j
-    pos_count <- 0
-    neg_count <- 0
-    total_count <- 0
-    
-    for(i in 1:(length(x_sub)-1)) {
-      for(j in (i+1):length(x_sub)) {
-        if(x_sub[i] > x_sub[j]) {
-          total_count <- total_count + 1
-          if(s_sub[i] > s_sub[j]) pos_count <- pos_count + 1
-          if(s_sub[i] < s_sub[j]) neg_count <- neg_count + 1
-        } else if(x_sub[j] > x_sub[i]) {
-          total_count <- total_count + 1
-          if(s_sub[j] > s_sub[i]) pos_count <- pos_count + 1
-          if(s_sub[j] < s_sub[i]) neg_count <- neg_count + 1
-        }
-      }
-    }
-    
-    if(total_count == 0) return("neutral")
-    
-    prop_pos <- pos_count / total_count
-    prop_neg <- neg_count / total_count
-    
-    if(prop_pos >= majority_threshold) return("promoting predictor")
-    if(prop_neg >= majority_threshold) return("mitigating predictor")
+  
+  x <- df[[feature_col]]
+  s <- df[[shap_col]]
+  
+  ## Removing missing values
+  valid <- complete.cases(x, s)
+  x <- x[valid]
+  s <- s[valid]
+  
+  ## If feature or SHAP has no variation
+  if(length(unique(x)) <= 1 || length(unique(s)) <= 1) return("undefined")
+  
+  ## Binary / sparse feature (0/1 or very few unique values)
+  if(length(unique(x)) <= 2 || quantile(x, 0.75) == 0) {
+    group0 <- s[x == min(x)]
+    group1 <- s[x == max(x)]
+    n_pos <- sum(outer(group1, group0, FUN = ">"))
+    n_total <- length(group1) * length(group0)
+    prop <- n_pos / n_total
+    if(prop >= majority_threshold) return("promoting predictor")
+    if(prop <= (1 - majority_threshold)) return("mitigating predictor")
     return("neutral")
   }
+  
+  ## Continuous / ordered feature
+  
+  # Pairwise comparison approach (generalization of Mann-Whitney)
+
+  # All pairs where feature_i > feature_j
+  pos_count <- 0
+  neg_count <- 0
+  total_count <- 0
+  
+  for(i in 1:(length(x)-1)) {
+    for(j in (i+1):length(x)) {
+      if(x[i] > x[j]) {
+        total_count <- total_count + 1
+        if(s[i] > s[j]) pos_count <- pos_count + 1
+        if(s[i] < s[j]) neg_count <- neg_count + 1
+      } else if(x[j] > x[i]) {
+        total_count <- total_count + 1
+        if(s[j] > s[i]) pos_count <- pos_count + 1
+        if(s[j] < s[i]) neg_count <- neg_count + 1
+      }
+    }
+  }
+  
+  if(total_count == 0) return("neutral")
+  
+  prop_pos <- pos_count / total_count
+  prop_neg <- neg_count / total_count
+  
+  if(prop_pos >= majority_threshold) return("promoting predictor")
+  if(prop_neg >= majority_threshold) return("mitigating predictor")
+  return("neutral")
+}
 
 #----------------------------------------------------------------
 #### Data import and preprocessing ####
@@ -836,6 +834,7 @@ fwrite(shap_score_sub,paste("shap_score_sub_",Sys.Date(),".txt",sep=""), sep = "
 
 # SHAP and Cox comparison
 fwrite(Compa_Cox_SHAP,paste("Compa_Cox_SHAP_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+
 
 
 
