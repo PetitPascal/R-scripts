@@ -165,7 +165,7 @@ normalize_custom <- function(x, new_min, new_max) {
 }
 
 ## Function for determining the feature direction effect (i.e.: how a feature impacts the model)
-determine_shap_direction <- function(df, feature_col, shap_col,
+determine_direction <- function(df, feature_col, shap_col,
                                      majority_threshold = 0.55,
                                      n_grid = 100,
                                      gam_k = 10) {
@@ -835,5 +835,6 @@ fwrite(shap_score_sub,paste("shap_score_sub_",Sys.Date(),".txt",sep=""), sep = "
 
 # SHAP and Cox comparison
 fwrite(Compa_Cox_SHAP,paste("Compa_Cox_SHAP_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+
 
 
