@@ -211,7 +211,7 @@ determine_direction <- function(df, feature_col, shap_col, majority_threshold = 
   ## Continuous / ordered feature
   
   # Pairwise comparison approach (generalization of Mann-Whitney)
-
+  
   # All pairs where feature_i > feature_j
   pos_count <- 0
   neg_count <- 0
@@ -758,5 +758,5 @@ fwrite(test_tmp,paste("test_tmp_",Sys.Date(),".csv",sep=""), sep = ";", row.name
 fwrite(test,paste("test_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
 fwrite(shap,paste("shap_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
 fwrite(shap_score_sub,paste("shap_score_sub_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
-fwrite(Association_tab_res,paste("Univariate Cox regression_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+fwrite(Association_tab_res,paste("Univariate GLM regression_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
 fwrite(Compa_GLM_SHAP,paste("Compa_GLM_SHAP_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
