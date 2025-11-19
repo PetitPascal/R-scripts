@@ -165,41 +165,62 @@ normalize_custom <- function(x, new_min, new_max) {
 }
 
 ## Function for determining the feature direction effect (i.e.: how a feature impacts the model)
-determine_shap_direction <- function(df, feature_col, shap_col, n_bins = 10, prop_threshold = 0.55) {
-  
-  # Extracting feature and SHAP vector values
+determine_shap_direction <- function(df, feature_col, shap_col,
+                                     majority_threshold = 0.55,
+                                     n_grid = 100,
+                                     gam_k = 10) {
   x <- df[[feature_col]]
   s <- df[[shap_col]]
   
-  # Removing NAs
+  # Removing missing values
   valid <- complete.cases(x, s)
-  x <- x[valid]
-  s <- s[valid]
+  x <- x[valid]; s <- s[valid]
   
-  # Handling constant features
+  # For cases when all values are identical
   if(length(unique(x)) <= 1 || length(unique(s)) <= 1) return("undefined")
-  
-  # Binary or sparse features
+
+  # Binary or sparse feature
   if(length(unique(x)) <= 2) {
-    prop_positive <- mean(s[x > 0] > 0, na.rm = TRUE)
-    prop_negative <- mean(s[x > 0] < 0, na.rm = TRUE)
-    if(prop_positive >= prop_threshold) return("promoting predictor")
-    if(prop_negative >= prop_threshold) return("mitigating predictor")
+    group0 <- s[x == min(x)]
+    group1 <- s[x == max(x)]
+    n_pos <- sum(outer(group1, group0, FUN = ">")) # counting pairs where SHAP(group1) > SHAP(group0)
+    n_total <- length(group1) * length(group0)
+    prop <- n_pos / n_total
+    
+    if(prop >= majority_threshold) return("promoting predictor")
+    if(prop <= (1 - majority_threshold)) return("mitigating predictor")
     return("neutral")
   }
   
-  # Continuous features: binning into quantiles
-  bins <- cut(x, breaks = quantile(x, probs = seq(0,1,length.out = n_bins+1), na.rm = TRUE),
-              include.lowest = TRUE, labels = FALSE)
+  # Continuous / ordered feature
+  try({ # Fitting GAM first
+    gam_fit <- gam(s ~ s(x, k = gam_k), method = "REML")
+    x_grid <- seq(min(x), max(x), length.out = n_grid)
+    s_pred <- predict(gam_fit, newdata = data.frame(x = x_grid))
+    slopes <- diff(s_pred)
+  }, silent = TRUE)
   
-  bin_means <- tapply(s, bins, mean, na.rm = TRUE)
+  if(!exists("slopes") || all(is.na(slopes))) { # If GAM fails, fallback to LOESS
+    loess_fit <- loess(s ~ x, span = 0.5)
+    x_grid <- seq(min(x), max(x), length.out = n_grid)
+    s_pred <- predict(loess_fit, newdata = data.frame(x = x_grid))
+    slopes <- diff(s_pred)
+  }
   
-  # Computing overall trend across bins
-  slope <- lm(bin_means ~ seq_along(bin_means))$coefficients[2]
+  # If slope still cannot be computed - Spearman correlation
+  if(is.null(slopes) || all(is.na(slopes))){
+    rho<-suppressWarnings(cor(x,s,method="spearman"))
+    if(is.na(rho)) return("undefined")
+    if(abs(rho)<0.05) return("neutral")
+    return(ifelse(rho>0,"promoting predictor","mitigating predictor"))
+  }
   
-  # Assigning direction based on slope
-  if(slope > 0) return("promoting predictor")
-  if(slope < 0) return("mitigating predictor")
+  # Aggregating slope signs
+  prop_pos <- mean(slopes > 0, na.rm = TRUE)
+  prop_neg <- mean(slopes < 0, na.rm = TRUE)
+  
+  if(prop_pos >= majority_threshold) return("promoting predictor")
+  if(prop_neg >= majority_threshold) return("mitigating predictor")
   return("neutral")
 }
 
@@ -814,4 +835,5 @@ fwrite(shap_score_sub,paste("shap_score_sub_",Sys.Date(),".txt",sep=""), sep = "
 
 # SHAP and Cox comparison
 fwrite(Compa_Cox_SHAP,paste("Compa_Cox_SHAP_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+
 
