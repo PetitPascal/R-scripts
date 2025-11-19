@@ -183,46 +183,70 @@ test_format<-function(x){
 }
 
 # Function for determining the direction (i.e.: how a feature impacts the model)
-determine_direction<-function(df,feature_col,shap_col){
-  
-  # extracting vectors
-  x<-df[[feature_col]]
-  s<-df[[shap_col]]
-  
-  # removing NA
-  valid<-complete.cases(x,s)
-  x<-x[valid]
-  s<-s[valid]
-  
-  # for cases when all values are identical
-  if(length(unique(x))<=1||length(unique(s))<=1){
-    return("undefined")
-  }
-  
-  # for cases when the feature is binary or sparse
-  if(length(unique(x))<=2||quantile(x,0.75)==0){
-    mean_diff<-mean(s[x>0],na.rm=T)-mean(s[x<=0],na.rm=T)
+determine_direction <- function(df, feature_col, shap_col, majority_threshold = 0.55) {
     
-    return(ifelse(mean_diff>0,'promoting factor',ifelse(mean_diff<0,"limiting factor","neutral")))
-  }
-  
-  # for cases when the feature is continuous
-  tryCatch({
-    gam_model<-gam(s~s(x), method='REML')
-    derivs<-derivatives(gam_model, term='s(x)')
-    mean_deriv<-mean(derivs$derivative,na.rm=T)
+    x <- df[[feature_col]]
+    s <- df[[shap_col]]
     
-    return(ifelse(mean_deriv>0,'promoting factor',ifelse(mean_deriv<0,"limiting factor","neutral")))
-  }, error=function(e){
+    ## Removing missing values
+    valid <- complete.cases(x, s)
+    x <- x[valid]
+    s <- s[valid]
     
-    # if GAM fails, Spearman correlation is computed
-    rho<-suppressWarnings(cor(x,s,method="spearman"))
-    if(is.na(rho)) return("undefined")
-    if(abs(rho)<0.05) return("neutral")
-    return(ifelse(rho>0,"promoting factor","limiting factor"))
+    ## If feature or SHAP has no variation
+    if(length(unique(x)) <= 1 || length(unique(s)) <= 1) return("undefined")
+    
+    ## Binary / sparse feature (0/1 or very few unique values)
+    if(length(unique(x)) <= 2 || quantile(x, 0.75) == 0) {
+      group0 <- s[x == min(x)]
+      group1 <- s[x == max(x)]
+      n_pos <- sum(outer(group1, group0, FUN = ">"))
+      n_total <- length(group1) * length(group0)
+      prop <- n_pos / n_total
+      if(prop >= majority_threshold) return("promoting predictor")
+      if(prop <= (1 - majority_threshold)) return("mitigating predictor")
+      return("neutral")
+    }
+    
+    ## Continuous / ordered feature
+    
+    # Pairwise comparison approach (generalization of Mann-Whitney)
+    n <- length(x)
+    if(n > 1e6) {  # avoiding huge O(n^2) computation: sample pairs
+      idx <- sample(n, 1e6)
+      x_sub <- x[idx]; s_sub <- s[idx]
+    } else {
+      x_sub <- x; s_sub <- s
+    }
+    
+    # All pairs where feature_i > feature_j
+    pos_count <- 0
+    neg_count <- 0
+    total_count <- 0
+    
+    for(i in 1:(length(x_sub)-1)) {
+      for(j in (i+1):length(x_sub)) {
+        if(x_sub[i] > x_sub[j]) {
+          total_count <- total_count + 1
+          if(s_sub[i] > s_sub[j]) pos_count <- pos_count + 1
+          if(s_sub[i] < s_sub[j]) neg_count <- neg_count + 1
+        } else if(x_sub[j] > x_sub[i]) {
+          total_count <- total_count + 1
+          if(s_sub[j] > s_sub[i]) pos_count <- pos_count + 1
+          if(s_sub[j] < s_sub[i]) neg_count <- neg_count + 1
+        }
+      }
+    }
+    
+    if(total_count == 0) return("neutral")
+    
+    prop_pos <- pos_count / total_count
+    prop_neg <- neg_count / total_count
+    
+    if(prop_pos >= majority_threshold) return("promoting predictor")
+    if(prop_neg >= majority_threshold) return("mitigating predictor")
+    return("neutral")
   }
-  )
-}
 
 ## not including function (opposite function of %in%)
 `%ni%`<-Negate('%in%')
