@@ -165,61 +165,86 @@ normalize_custom <- function(x, new_min, new_max) {
 }
 
 ## Function for determining the feature direction effect (i.e.: how a feature impacts the model)
-determine_direction <- function(df, feature_col, shap_col, majority_threshold = 0.55) {
+determine_direction <- function(df, feature_col, shap_col,
+                                majority_threshold = 0.55,
+                                n_bins = 200) {
   
   x <- df[[feature_col]]
   s <- df[[shap_col]]
   
-  ## Removing missing values
   valid <- complete.cases(x, s)
-  x <- x[valid]
-  s <- s[valid]
+  x <- x[valid]; s <- s[valid]
   
-  ## If feature or SHAP has no variation
-  if(length(unique(x)) <= 1 || length(unique(s)) <= 1) return("undefined")
+  if (length(unique(x)) <= 1 || length(unique(s)) <= 1)
+    return("undefined")
   
-  ## Binary / sparse feature (0/1 or very few unique values)
-  if(length(unique(x)) <= 2 || quantile(x, 0.75) == 0) {
+  #---------------------------
+  # BINARY / SPARSE FEATURES
+  #---------------------------
+  if (length(unique(x)) <= 2 || quantile(x, 0.75) == 0) {
+    
     group0 <- s[x == min(x)]
     group1 <- s[x == max(x)]
-    n_pos <- sum(outer(group1, group0, FUN = ">"))
-    n_total <- length(group1) * length(group0)
-    prop <- n_pos / n_total
-    if(prop >= majority_threshold) return("promoting predictor")
-    if(prop <= (1 - majority_threshold)) return("mitigating predictor")
+    
+    n0 <- length(group0); n1 <- length(group1)
+    if (n0 == 0 || n1 == 0) return("neutral")
+    
+    group0_sorted <- sort(group0)
+    
+    pos_count <- sum(findInterval(group1, group0_sorted, left.open = TRUE))
+    n_total <- as.double(n0) * as.double(n1)
+    
+    prop <- pos_count / n_total
+    if (prop >= majority_threshold) return("promoting predictor")
+    if (prop <= (1 - majority_threshold)) return("mitigating predictor")
     return("neutral")
   }
   
-  ## Continuous / ordered feature
+  #---------------------------
+  # CONTINUOUS FEATURES
+  #---------------------------
   
-  # Pairwise comparison approach (generalization of Mann-Whitney)
-
-  # All pairs where feature_i > feature_j
-  pos_count <- 0
-  neg_count <- 0
-  total_count <- 0
+  bins <- cut(x, breaks = n_bins, include.lowest = TRUE)
   
-  for(i in 1:(length(x)-1)) {
-    for(j in (i+1):length(x)) {
-      if(x[i] > x[j]) {
-        total_count <- total_count + 1
-        if(s[i] > s[j]) pos_count <- pos_count + 1
-        if(s[i] < s[j]) neg_count <- neg_count + 1
-      } else if(x[j] > x[i]) {
-        total_count <- total_count + 1
-        if(s[j] > s[i]) pos_count <- pos_count + 1
-        if(s[j] < s[i]) neg_count <- neg_count + 1
-      }
-    }
-  }
+  bx <- tapply(x, bins, mean)
+  bs <- tapply(s, bins, mean)
+  bc <- as.numeric(tapply(s, bins, length))
   
-  if(total_count == 0) return("neutral")
+  keep <- !is.na(bx)
+  bx <- bx[keep]
+  bs <- bs[keep]
+  bc <- bc[keep]
   
-  prop_pos <- pos_count / total_count
-  prop_neg <- neg_count / total_count
+  B <- length(bx)
+  if (B < 2) return("neutral")
   
-  if(prop_pos >= majority_threshold) return("promoting predictor")
-  if(prop_neg >= majority_threshold) return("mitigating predictor")
+  # Vectorized pairwise comparisons
+  bx_mat_i <- matrix(bx, B, B)
+  bx_mat_j <- t(bx_mat_i)
+  
+  bs_mat_i <- matrix(bs, B, B)
+  bs_mat_j <- t(bs_mat_i)
+  
+  # Determining which bin has higher feature value
+  higher_x <- bx_mat_i > bx_mat_j
+  
+  # Counting sample pairs
+  bc_mat_i <- matrix(as.numeric(bc), B, B)
+  bc_mat_j <- t(bc_mat_i)
+  n_pairs  <- bc_mat_i * bc_mat_j
+  
+  total_pairs <- sum(n_pairs[higher_x])
+  
+  if (total_pairs == 0) return("neutral")
+  
+  pos_pairs <- sum(n_pairs[higher_x & (bs_mat_i > bs_mat_j)])
+  neg_pairs <- sum(n_pairs[higher_x & (bs_mat_i < bs_mat_j)])
+  
+  prop_pos <- pos_pairs / total_pairs
+  prop_neg <- neg_pairs / total_pairs
+  
+  if (prop_pos >= majority_threshold) return("promoting predictor")
+  if (prop_neg >= majority_threshold) return("mitigating predictor")
   return("neutral")
 }
 
@@ -834,6 +859,7 @@ fwrite(shap_score_sub,paste("shap_score_sub_",Sys.Date(),".txt",sep=""), sep = "
 
 # SHAP and Cox comparison
 fwrite(Compa_Cox_SHAP,paste("Compa_Cox_SHAP_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+
 
 
 
