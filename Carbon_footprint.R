@@ -431,31 +431,31 @@ as_emissions_long <- function(res) {
 
 ## Example 1: auto-detecting CPU and using UK carbon intensity
 res1 <- monitor_emissions(
-  quote({
+  code = {
     Sys.sleep(1)
     x <- rnorm(2e6)
     sum(x)
-  }),
+  },
   verbose = TRUE
 )
 as_emissions_long(res1)
 
 ## Example 2: providing known CPU watts (overriding TDP detection)
 res2 <- monitor_emissions(
-  quote({
+  code = {
     mat <- matrix(rnorm(1e7), ncol = 1000)
     mean(mat)
-  }),
+  },
   cpu_watts = 95,
   verbose = TRUE)
 as_emissions_long(res2)
 
 ## Example 3: disabling GPU sampling (for machines without nvidia-smi)
 res3 <- monitor_emissions(
-  quote({
+  code = {
     Sys.sleep(0.5)
     sum(rnorm(5e6))
-  }),
+  },
   use_gpu_sampling = FALSE,
   verbose = TRUE)
 
@@ -464,10 +464,10 @@ as_emissions_long(res3)
 ## Example 4: auto-detecting CPU and using carbon intensity specified by user
 
 res4 <- monitor_emissions(
-  code = quote({
+  code = {
     x <- rnorm(1e6)
     mean(x)
-  }),
+  },
   carbon_region="FR",
   carbon_fallback_gpkwh = 60,
   verbose = TRUE)
