@@ -29,6 +29,7 @@ library(processx)
 library(digest)
 library(jsonlite)
 library(httr)
+library(tidyverse)
 
 #----------------------------------------------------------------
 #### Creating a table with default CPU TDP values (to adapt) ####
