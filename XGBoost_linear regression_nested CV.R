@@ -656,7 +656,7 @@ plot1<-ggplot(test_tmp,aes(y=feature,x=mean_val,col=impact))+
   theme_bw()+
   scale_color_manual("Direction:",
                      na.value="white",
-                     values=rev(c("neutral"="white","promoting predictor"="#C35C33","mitigating predictor"="#40B696")))+
+                     values=rev(c("neutral"="black","promoting predictor"="#C35C33","mitigating predictor"="#40B696")))+
   theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
         strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
         axis.text.y = element_text(size=16,color="black"),
