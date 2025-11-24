@@ -671,9 +671,9 @@ test_tmp<-test %>% mutate(impact=direction) %>%
   mutate(mean_val=as.numeric(mean_val),
          IC_2.5=as.numeric(IC_2.5),
          IC_97.5=as.numeric(IC_97.5)) %>%
-  mutate(mean_val=if_else(impact=="limiting factor",-mean_val,mean_val),
-         IC_2.5=if_else(impact=="limiting factor",-IC_2.5,IC_2.5),
-         IC_97.5=if_else(impact=="limiting factor",-IC_97.5,IC_97.5))
+  mutate(mean_val=if_else(impact=="limiting predictor",-mean_val,mean_val),
+         IC_2.5=if_else(impact=="limiting predictor",-IC_2.5,IC_2.5),
+         IC_97.5=if_else(impact=="limiting predictor",-IC_97.5,IC_97.5))
 
 test_tmp<-test_tmp %>% arrange(desc(mean_val)) %>% filter(mean_val!=0) %>% filter(!is.na(mean_val))
 
@@ -686,20 +686,22 @@ ordre_def2<-test_tmp %>% filter(mean_val<0) %>% arrange(desc(IC_97.5))
 ordre_def<-bind_rows(ordre_def1,ordre_def2)
 
 test_tmp$feature<-factor(test_tmp$feature,levels=rev(unique(ordre_def$feature)))
-test_tmp$impact<-factor(test_tmp$impact,levels=c("limiting factor","neutral","promoting factor"),
-                        labels=c("limiting factor","no impact","promoting factor"))
+test_tmp$impact<-factor(test_tmp$impact,levels=c("limiting predictor","neutral","promoting predictor"),
+                        labels=c("limiting predictor","neutral","promoting predictor"))
 
 # Plot 1: error bar
 plot1<-ggplot(test_tmp,aes(y=feature,x=mean_val,col=impact))+
   geom_point()+
   geom_errorbar(aes(xmin = IC_2.5, xmax = IC_97.5))+
   scale_x_continuous("mean |SHAP value|",label=function(x) abs(x))+
-  geom_text(aes(x=IC_97.5,y=feature,label=abs(IC_97.5)),size=5,position=position_nudge(x = if_else(test_tmp$IC_97.5>=0,0.15,-0.15)))+
+  geom_text(aes(x=IC_97.5,y=feature,label=abs(IC_97.5)),size=5,position=position_nudge(x = if_else(test_tmp$IC_97.5>=0,
+                                                                                                   round(max(test_tmp$IC_97.5,na.rm=T)/10),
+                                                                                                   -round(max(test_tmp$IC_97.5,na.rm=T)/10))))+
   scale_y_discrete("")+
   theme_bw()+
   scale_color_manual("Direction:",
                      na.value="white",
-                     values=rev(c("white","#C35C33","#40B696")))+
+                     values=rev(c("neutral"="white","promoting predictor"="#C35C33","mitigating predictor"="#40B696")))+
   theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
         strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
         axis.text.y = element_text(size=16,color="black"),
@@ -722,13 +724,15 @@ test_tmp$feature<-factor(test_tmp$feature,levels=rev(unique(ordre_def$feature)))
 
 plot2<-ggplot(test_tmp,aes(y=feature,x=mean_val,fill=impact))+
   geom_bar(stat = "identity",col='black')+
-  geom_text(aes(x=mean_val,y=feature,label=mean_SHAP),size=6,position=position_nudge(x = if_else(test_tmp$mean_val>=0,0.2,-0.2)))+
-  scale_x_continuous("mean |SHAP value|",label=function(x) abs(x),limits=c(-0.75,1.25))+
+  geom_text(aes(x=mean_val,y=feature,label=mean_SHAP),size=6,position=position_nudge(x = if_else(test_tmp$mean_val>=0,
+                                                                                                 round(max(test_tmp$mean_val,na.rm=T)/10),
+                                                                                                 -round(max(test_tmp$mean_val,na.rm=T)/10))))+
+  scale_x_continuous("mean |SHAP value|",label=function(x) abs(x))+
   scale_y_discrete("")+
   theme_bw()+
   scale_fill_manual("Direction:",
                     na.value="white",
-                    values=c("#A6DDCE","#F9CBC2"))+
+                    values=c("mitigating predictor"="#A6DDCE","promoting predictor"="#F9CBC2"))+
   theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
         strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
         axis.text = element_text(size=16,color="black", face = "bold"),
