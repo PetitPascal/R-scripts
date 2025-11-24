@@ -7,7 +7,7 @@ gctorture(FALSE)
 ## Installing packages if needed
 pack_needed<-c("data.table","tidyverse","mllrnrs","broom","doParallel","foreach",
                "splitTools","conflicted","grid","gridExtra","RColorBrewer","mlbench",
-               "mlexperiments","caret","MLmetrics","patchwork",
+               "mlexperiments","caret","MLmetrics","patchwork","yardstick","pROC","ordinal","performance",
                "xgboost","parallel","here","irr")
 for (i in 1:length(pack_needed)){
   if(pack_needed[i]%in%.packages(all.available=TRUE)){
