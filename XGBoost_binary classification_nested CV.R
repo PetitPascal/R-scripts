@@ -732,7 +732,7 @@ plot2<-ggplot(test_tmp,aes(y=feature,x=mean_val,fill=impact))+
   theme_bw()+
   scale_fill_manual("Direction:",
                     na.value="white",
-                    values=c("mitigating predictor"="#A6DDCE","promoting predictor"="#F9CBC2"))+
+                    values=c("mitigating predictor"="#A6DDCE","promoting predictor"="#F9CBC2","neutral"="white"))+
   theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
         strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
         axis.text = element_text(size=16,color="black", face = "bold"),
