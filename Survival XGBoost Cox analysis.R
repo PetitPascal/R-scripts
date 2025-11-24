@@ -859,11 +859,3 @@ fwrite(shap_score_sub,paste("shap_score_sub_",Sys.Date(),".txt",sep=""), sep = "
 
 # SHAP and Cox comparison
 fwrite(Compa_Cox_SHAP,paste("Compa_Cox_SHAP_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
-
-
-
-
-
-
-
-
