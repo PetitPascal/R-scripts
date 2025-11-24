@@ -458,7 +458,7 @@ outer_summary
 #--------------------------
 ## Retraining final model on full training set
 
-# Picking the best params (e.g., from highest outer AUROC)
+# Picking the best params (e.g., from lowest outer MAE)
 best_idx <- which.min(outer_summary$MAE)
 final_params <- best_params_all[[best_idx]]
 
