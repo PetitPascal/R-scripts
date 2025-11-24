@@ -671,9 +671,9 @@ test_tmp<-test %>% mutate(impact=direction) %>%
   mutate(mean_val=as.numeric(mean_val),
          IC_2.5=as.numeric(IC_2.5),
          IC_97.5=as.numeric(IC_97.5)) %>%
-  mutate(mean_val=if_else(impact=="limiting predictor",-mean_val,mean_val),
-         IC_2.5=if_else(impact=="limiting predictor",-IC_2.5,IC_2.5),
-         IC_97.5=if_else(impact=="limiting predictor",-IC_97.5,IC_97.5))
+  mutate(mean_val=if_else(impact=="mitigating predictor",-mean_val,mean_val),
+         IC_2.5=if_else(impact=="mitigating predictor",-IC_2.5,IC_2.5),
+         IC_97.5=if_else(impact=="mitigating predictor",-IC_97.5,IC_97.5))
 
 test_tmp<-test_tmp %>% arrange(desc(mean_val)) %>% filter(mean_val!=0) %>% filter(!is.na(mean_val))
 
@@ -686,8 +686,8 @@ ordre_def2<-test_tmp %>% filter(mean_val<0) %>% arrange(desc(IC_97.5))
 ordre_def<-bind_rows(ordre_def1,ordre_def2)
 
 test_tmp$feature<-factor(test_tmp$feature,levels=rev(unique(ordre_def$feature)))
-test_tmp$impact<-factor(test_tmp$impact,levels=c("limiting predictor","neutral","promoting predictor"),
-                        labels=c("limiting predictor","neutral","promoting predictor"))
+test_tmp$impact<-factor(test_tmp$impact,levels=c("mitigating predictor","neutral","promoting predictor"),
+                        labels=c("mitigating predictor","neutral","promoting predictor"))
 
 # Plot 1: error bar
 plot1<-ggplot(test_tmp,aes(y=feature,x=mean_val,col=impact))+
