@@ -194,7 +194,7 @@ determine_direction <- function(df, feature_col, shap_col,
   x <- x[valid]; s <- s[valid]
   
   if (length(unique(x)) <= 1 || length(unique(s)) <= 1)
-    return("undefined")
+    return("neutral")
   
   #---------------------------
   # BINARY / SPARSE FEATURES
