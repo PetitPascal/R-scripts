@@ -458,7 +458,7 @@ outer_summary
 #--------------------------
 ## Retraining final model on full training set
 
-# Picking the best params (e.g., from lowest outer MAE)
+# Picking the best params (e.g., from highest outer AUROC)
 best_idx <- which.min(outer_summary$MAE)
 final_params <- best_params_all[[best_idx]]
 
@@ -525,6 +525,10 @@ model_eval<-model_eval %>% rowwise %>% mutate_if(is.numeric,test_format) %>% ung
 write.table(outer_summary,paste("CV summary table_",Sys.Date(),".csv"),sep=";",col.names=T,row.names=F)
 write.table(model_eval,paste("Model eval_",Sys.Date(),".csv"),sep=";",col.names=T,row.names=F)
 write.table(as_tibble(final_params),paste("Best hyperparameters_",Sys.Date(),".csv"),sep=";",col.names=T,row.names=F)
+
+#----------------------------------------------------------------
+#### Association analysis across all classes
+#----------------------------------------------------------------
 
 #----------------------------------------------------------------
 #### Univariate association analysis ####
@@ -736,7 +740,7 @@ plot1<-ggplot(test_tmp,aes(y=feature,x=mean_val,col=impact))+
 
 # Exporting plot 1
 ggsave(plot1,
-       file=paste("SHAP_errorbar_",
+       file=paste("Across all classes_SHAP_errorbar_",
                   Sys.Date(),".pdf",sep=""),
        dpi=600,width=60,height=30,units = "cm",limitsize=F)
 
@@ -766,7 +770,7 @@ plot2<-ggplot(test_tmp,aes(y=feature,x=mean_val,fill=impact))+
 
 # Exporting plot 2
 ggsave(plot2,
-       file=paste("SHAP_barplot_",
+       file=paste("Across all classes_SHAP_barplot_",
                   Sys.Date(),".pdf",sep=""),
        dpi=600,width=60,height=30,units = "cm",limitsize=F)
 
@@ -793,10 +797,259 @@ Compa_CLM_SHAP<-left_join(test_SHAP_tmp,tmp_CLM,by="feature")
 #### Saving SHAP results
 
 # SHAP values
-fwrite(Shap_val,paste("Shap_val_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
-fwrite(test_tmp,paste("test_tmp_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
-fwrite(test,paste("test_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
-fwrite(shap,paste("shap_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
-fwrite(shap_score_sub,paste("shap_score_sub_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
-fwrite(Association_tab_res,paste("Univariate CLM regression_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
-fwrite(Compa_CLM_SHAP,paste("Compa_CLM_SHAP_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+fwrite(Shap_val,paste("Across all classes_Shap_val_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+fwrite(test_tmp,paste("Across all classes_test_tmp_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+fwrite(test,paste("Across all classes_test_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
+fwrite(shap,paste("Across all classes_shap_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
+fwrite(shap_score_sub,paste("Across all classes_shap_score_sub_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
+fwrite(Association_tab_res,paste("Across all classes_Univariate CLM regression_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+fwrite(Compa_CLM_SHAP,paste("Across all classes_Compa_CLM_SHAP_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+
+#----------------------------------------------------------------
+#### Association analysis for each class
+#----------------------------------------------------------------
+
+for(n_clust in 1:num_class){
+  
+  #----------------------------------------------------------------
+  #### Univariate association analysis ####  
+  
+  y_test_class<-if_else(y_test==sort(unique(y_test))[n_clust],1,0)
+  
+  var_test<-colnames(X_test)
+  
+  Association_tab_res<-c()
+  
+  for(n_var in 1:length(var_test)){
+    
+    test_tmpo<-as_tibble(X_test) %>% select(which(colnames(X_test)==var_test[n_var]))
+    colnames(test_tmpo)<-"tmp"
+    test_tmpo<-bind_cols(y_test_class,test_tmpo)
+    colnames(test_tmpo)[1]<-"outcome"
+    
+    glm_model<-glm(outcome ~ tmp, data = test_tmpo,family="binomial")
+    mod_res<-broom::tidy(glm_model,exponentiate=T,conf.int=T) %>%
+      filter(term!="(Intercept)") %>%
+      mutate(term=var_test[n_var],
+             direction=case_when(conf.low>=1~"positive association",
+                                 conf.high<1~"negative association",
+                                 T~"uncertain association")) %>% 
+      bind_cols(performance::performance(glm_model)) %>%
+      rowwise %>% 
+      mutate_if(is.numeric,test_format) %>%
+      ungroup %>%
+      mutate(OR=paste(estimate," [",conf.low,"; ",conf.high,"]",sep="")) %>%
+      mutate(OR=if_else(OR==" [; ]","",OR))
+    
+    Association_tab_res<-bind_rows(Association_tab_res,mod_res)
+    
+  }
+  
+  #----------------------------------------------------------------
+  #### SHAP analysis ####
+  
+  #- - - - - - - - - -
+  ## Calculating SHAP values
+  contr <- predict(xgb_final, as.matrix(X_test[,xgb_final$feature_names]), predcontrib = TRUE)
+  shap<-as_tibble(contr[[n_clust]])
+  shap_contrib <- as.data.table(contr[[n_clust]])
+  
+  #- - - - - - - - - -
+  ## Removing BIAS term
+  shap_contrib <- shap_contrib[, !grepl("bias", names(shap_contrib), ignore.case = TRUE), with=FALSE]
+  
+  #- - - - - - - - - -
+  ## Computing mean SHAP score
+  mean_shap_score <- colMeans(abs(shap_contrib))[order(colMeans(abs(shap_contrib)), decreasing = T)]
+  
+  #- - - - - - - - - -
+  ## Reshaping SHAP values to long format
+  shap_score<-shap_contrib
+  shap_score_sub <- as.data.table(shap_score)
+  shap_score_sub <- shap_score_sub[, names(mean_shap_score), with = F]
+  shap_score_long <- melt.data.table(shap_score_sub, measure.vars = colnames(shap_score_sub))
+  
+  #- - - - - - - - - -
+  ## Matching feature values
+  fv_sub <- as.data.table(X_test)[, names(mean_shap_score), with = F]
+  fv_sub_long <- melt.data.table(fv_sub, measure.vars = colnames(fv_sub))
+  fv_sub_long[, stdfvalue := std1(value), by = "variable"]
+  names(fv_sub_long) <- c("variable", "rfvalue", "stdfvalue" )
+  
+  #- - - - - - - - - -
+  ## Merging  SHAP and feature values
+  shap_long2 <- cbind(shap_score_long, fv_sub_long[,c('rfvalue','stdfvalue')])
+  shap_long2[, mean_value := mean(abs(value)), by = variable]
+  setkey(shap_long2, variable)
+  
+  #- - - - - - - - - -
+  ## Computting summary statistics per feature
+  Shap_val<-as_tibble(shap_long2) %>% 
+    group_by(variable) %>% 
+    mutate(IC_2.5=quantile(abs(value),0.025),
+           IC_97.5=quantile(abs(value),0.975),
+           mean_val=mean(abs(value),na.rm=T)) %>%
+    select(variable,mean_val,IC_2.5,IC_97.5) %>% 
+    distinct %>% 
+    arrange(desc(mean_val)) %>%
+    mutate(mean_SHAP=paste(signif(mean_val,3)," (",signif(IC_2.5,3),"; ",signif(IC_97.5,3),")",sep="")) %>% ungroup
+  
+  colnames(Shap_val)[1]<-"feature"
+  
+  #- - - - - - - - - -
+  ## Formmating SHAP values
+  Shap_val<-Shap_val %>% rowwise() %>% mutate(mean_val=test_format(mean_val),
+                                              IC_2.5=test_format(IC_2.5),
+                                              IC_97.5=test_format(IC_97.5)) %>%
+    ungroup %>% mutate(mean_SHAP=paste(mean_val," (",IC_2.5,"; ",IC_97.5,")",sep="")) %>% 
+    mutate(mean_SHAP=if_else(mean_SHAP=="0 (0; 0)"|mean_SHAP=="0e+00 (0e+00; 0e+00)","0",mean_SHAP))
+  
+  #- - - - - - - - - -
+  ## Pivoting SHAP and features long format
+  shap_tempo <- shap %>% 
+    rowid_to_column("id") %>%
+    pivot_longer(-id, names_to = "feature", values_to = "shap_value")
+  
+  tempopo <- X_test[, xgb_final$feature_names] %>%
+    as_tibble() %>%
+    rowid_to_column("id") %>%
+    pivot_longer(-id, names_to = "feature", values_to = "feature_value")
+  
+  tempopo <- left_join(tempopo, shap_tempo, by = c("id", "feature"))
+  
+  #- - - - - - - - - -
+  ## SHAP summary and merging labels
+  tempopo<-left_join(tempopo,Shap_val,by=base::intersect(colnames(tempopo),colnames(Shap_val))) %>% distinct
+  
+  test3<-Shap_val %>% arrange(desc(as.numeric(mean_val)))
+  
+  #- - - - - - - - - -
+  ## SHAP directionality
+  direction_impact<-tempopo %>% group_by(feature) %>%
+    group_map(~tibble(feature=.y$feature,
+                      direction=determine_direction(.x,"feature_value","shap_value")
+    )) %>%
+    bind_rows
+  
+  test<-left_join(tempopo,direction_impact,by="feature")
+  
+  test<-left_join(test,Shap_val,by=base::intersect(colnames(test),colnames(Shap_val)))
+  
+  test_tmp<-test %>% mutate(impact=direction) %>%
+    select(feature, mean_val,IC_2.5,IC_97.5,impact,mean_SHAP) %>% 
+    distinct() %>%
+    mutate(mean_val=as.numeric(mean_val),
+           IC_2.5=as.numeric(IC_2.5),
+           IC_97.5=as.numeric(IC_97.5)) %>%
+    mutate(mean_val=if_else(impact=="mitigating predictor",-mean_val,mean_val),
+           IC_2.5=if_else(impact=="mitigating predictor",-IC_2.5,IC_2.5),
+           IC_97.5=if_else(impact=="mitigating predictor",-IC_97.5,IC_97.5))
+  
+  test_tmp<-test_tmp %>% arrange(desc(mean_val)) %>% filter(mean_val!=0) %>% filter(!is.na(mean_val))
+  
+  test_tmp_save<-test_tmp
+  test_tmp<-test_tmp %>% arrange(desc(abs(mean_val))) %>% slice(1:30)
+  
+  #- - - - - - - - - -
+  ## Plotting SHAP
+  
+  # reordoring factors
+  ordre_def1<-test_tmp %>% filter(mean_val>=0) %>% arrange(desc(IC_2.5))
+  ordre_def2<-test_tmp %>% filter(mean_val<0) %>% arrange(desc(IC_97.5))
+  ordre_def<-bind_rows(ordre_def1,ordre_def2)
+  
+  test_tmp$feature<-factor(test_tmp$feature,levels=rev(unique(ordre_def$feature)))
+  test_tmp$impact<-factor(test_tmp$impact,levels=c("mitigating predictor","neutral","promoting predictor"),
+                          labels=c("mitigating predictor","neutral","promoting predictor"))
+  
+  # Plot 1: error bar
+  plot1<-ggplot(test_tmp,aes(y=feature,x=mean_val,col=impact))+
+    geom_point()+
+    geom_errorbar(aes(xmin = IC_2.5, xmax = IC_97.5))+
+    scale_x_continuous("mean |SHAP value|",label=function(x) abs(x))+
+    geom_text(aes(x=IC_97.5,y=feature,label=abs(IC_97.5)),size=5,position=position_nudge(x = if_else(test_tmp$IC_97.5>=0,
+                                                                                                     round(max(test_tmp$IC_97.5,na.rm=T)/10),
+                                                                                                     -round(max(test_tmp$IC_97.5,na.rm=T)/10))))+
+    scale_y_discrete("")+
+    theme_bw()+
+    scale_color_manual("Direction:",
+                       na.value="white",
+                       values=rev(c("neutral"="black","promoting predictor"="#C35C33","mitigating predictor"="#40B696")))+
+    theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
+          strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
+          axis.text.y = element_text(size=16,color="black"),
+          axis.text.x = element_text(size=16,color="black"),
+          axis.title=element_text(size=16,face="bold",color="black"),
+          legend.text = element_text(size = 16, face = "bold"),
+          legend.title = element_text(size = 16, face = "bold"),
+          legend.position="bottom",
+          axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+  
+  # Exporting plot 1
+  ggsave(plot1,
+         file=paste("Class ",n_clust,"_Patient journey_SHAP_errorbar_",
+                    Sys.Date(),".pdf",sep=""),
+         dpi=600,width=60,height=30,units = "cm",limitsize=F)
+  
+  # Plot 2: barplot
+  ordre_def<-test_tmp %>% arrange(desc(mean_val))
+  test_tmp$feature<-factor(test_tmp$feature,levels=rev(unique(ordre_def$feature)))
+  
+  plot2<-ggplot(test_tmp,aes(y=feature,x=mean_val,fill=impact))+
+    geom_bar(stat = "identity",col='black')+
+    geom_text(aes(x=mean_val,y=feature,label=mean_SHAP),size=6,position=position_nudge(x = if_else(test_tmp$mean_val>=0,
+                                                                                                   round(max(test_tmp$mean_val,na.rm=T)/10),
+                                                                                                   -round(max(test_tmp$mean_val,na.rm=T)/10))))+
+    scale_x_continuous("mean |SHAP value|",label=function(x) abs(x))+
+    scale_y_discrete("")+
+    theme_bw()+
+    scale_fill_manual("Direction:",
+                      na.value="white",
+                      values=c("promoting predictor"="#F9CBC2","mitigating predictor"="#A6DDCE","neutral"="white"))+
+    theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
+          strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
+          axis.text = element_text(size=16,color="black", face = "bold"),
+          axis.title=element_text(size=16,face="bold",color="black"),
+          legend.text = element_text(size = 16, face = "bold"),
+          legend.title = element_text(size = 16, face = "bold"),
+          legend.position="bottom",
+          axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+  
+  # Exporting plot 2
+  ggsave(plot2,
+         file=paste("Class ",n_clust,"_Patient journey_SHAP_barplot_",
+                    Sys.Date(),".pdf",sep=""),
+         dpi=600,width=60,height=30,units = "cm",limitsize=F)
+  
+  #- - - - - - - - - -
+  ## SHAP and GLM comparison
+  
+  tmp_GLM<-Association_tab_res %>% select(term,OR,direction,p.value,Log_loss)
+  colnames(tmp_GLM)<-c("feature","OR [95% CI]","GLM - association direction","GLM - p-value","GLM - log loss")
+  
+  test_SHAP_tmp<-test %>%  
+    select(feature,mean_SHAP,direction,mean_val) %>% 
+    distinct %>%
+    arrange(desc(abs(as.numeric(mean_val)))) %>%
+    rowwise %>%
+    mutate_if(is.numeric,test_format) %>%
+    ungroup %>%
+    select(-c(mean_val))
+  
+  colnames(test_SHAP_tmp)<-c("feature","mean_abs_SHAP [95% CI]","SHAP direction")
+  
+  Compa_GLM_SHAP<-left_join(test_SHAP_tmp,tmp_GLM,by="feature")
+  
+  #----------------------------------------------------------------
+  #### Saving SHAP results
+  
+  # SHAP values
+  fwrite(Shap_val,paste("Class ",n_clust,"_Patient journey_Shap_val_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+  fwrite(test_tmp,paste("Class ",n_clust,"_Patient journey_test_tmp_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+  fwrite(test,paste("Class ",n_clust,"_Patient journey_test_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
+  fwrite(shap,paste("Class ",n_clust,"_Patient journey_shap_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
+  fwrite(shap_score_sub,paste("Class ",n_clust,"_Patient journey_shap_score_sub_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
+  fwrite(Association_tab_res,paste("Class ",n_clust,"_Patient journey_Univariate CLM regression_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+  fwrite(Compa_GLM_SHAP,paste("Class ",n_clust,"_Patient journey_Compa_GLM_SHAP_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+  
+}
