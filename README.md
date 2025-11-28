@@ -1,6 +1,6 @@
 **Collection of reproducible data analysis scripts in R**
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17047856.svg)](https://doi.org/10.5281/zenodo.17047856)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17752875.svg)](https://doi.org/10.5281/zenodo.17752875)
 
 This repository provides a curated collection of R scripts designed to support reproducible data analysis.
 
