@@ -23,21 +23,85 @@ Researchers and users are encouraged to adapt these scripts for their own data a
 
 ***Contents***
 
-•	Survival XGBoost Cox analysis_Github_17-07-2025.R
+•	*Survival XGBoost Cox analysis.R*
 
 Implementation of Extreme Gradient Boosting (XGBoost) adapted for Cox proportional hazards modeling, suitable for time-to-event data.
 
-•	Logistic_BMA_script.R
-
-Performs Bayesian Model Averaging (BMA) for probabilistic model selection in logistic regression.
-
-•	XGBoost_binary classification_nested CV.R
+•	*XGBoost_binary classification_nested CV.R*
 
 Implements XGBoost for binary classification tasks with nested cross-validation, allowing for robust model evaluation and hyperparameter tuning.
 
+•	*XGBoost_linear regression_nested CV.R*
+
+Implements XGBoost for linear regression task with nested cross-validation, allowing for robust model evaluation and hyperparameter tuning.
+
+•	*XGBoost_ordinal logistic classification.R*
+
+Implements XGBoost for logistic ordinal classification tasks with nested cross-validation, allowing for robust model evaluation and hyperparameter tuning.
+
+•	*Multi-class XGBoost.R*
+
+Implements a multi-class prediction using XGBoost. Three reproducible and generalizable examples are provided:
+
+-Example 1: Predicting epidemic cluster based on epidemic curves
+  
+-Example 2: Predicting chemical exposure cluster based on age, BMI, physical activity
+  
+-Example 3: Predicting cardiovascular risk cluster based on age, BMI, physical activity, BP, cholesterol
+
+•	*Continuous_Multioutput_XGBoost.R*
+
+Implements a generalizable R and Python workflow for continuous multi-output regression using XGBoost.Three reproducible and generalizable examples are provided:
+
+-Example 1: Predict epidemic parameters (beta, mu, S0) from simulated epidemic curves (SIR model).
+  
+-Example 2: Predict chemical exposure (exposure_A, exposure_B) from age, BMI, and physical activity level.
+  
+-Example 3: Predict blood pressure and cholesterol from age, BMI, and physical activity level..
+
+•	*Linear BMA.R*
+
+Performs Bayesian Model Averaging (BMA) for probabilistic model selection in linear regression.
+
+•	*Logistic BMA.R*
+
+Performs BMA for probabilistic model selection in logistic regression.
+
+•	*SHAP_direction.R*
+
+Function for determining feature direction based on SHAP values using Rcpp pairwise counting.
+
+•	*BKMR.R*
+
+Performs a Bayesian kernel machine regression (BKMR) analysis.
+
+•	*WQS.R*
+
+Performs a Weighted Quantile Sum regression (WQS) analysis.
+
+•	*PSM.R*
+
+Performs a propensity score matching (PSM) analysis.
+
+•	*RCS.R*
+
+Performs a Restricted Cubic Spline (RCS) analysis.
+
+•	*Convert_semi transparent color to opaque.R*
+
+This function converts a semi-transparent color to its opaque equivalent, considering the visual effect on a white background.
+
+•	*Loading and using a model.R*
+
+This script loads a saved model, prepares new data, and makes predictions based on the model.
+
+•	*Carbon_footprint.R*
+
+Initial attempt to estimate energy consumption and carbon emissions from running R code. This function attempts to monitor CPU, RAM, and GPU usage of R code, estimate energy consumption, and calculate associated carbon emissions (gCO2).
+
 ***Requirements***
 
-•	R version ≥ 4.0.0
+•	R version ≥ 4.5.0
 
 •	Additional dependencies are listed in the header of each script.
 
@@ -85,6 +149,8 @@ https://doi.org/10.5281/zenodo.17047856.
 •	v1.0.0:	Initial release -	XGBoost for Cox proportional hazards modeling
 
 •	v1.0.1:	Update release	- Added Logistic BMA and XGBoost (binary classification with nested CV)
+
+•	v1.0.2:	Update release	- Added several new scripts
 
 ***Related Publications***
 
