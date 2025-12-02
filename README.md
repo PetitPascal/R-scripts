@@ -115,6 +115,10 @@ Function computing the geometric mean of a numeric vector.
 
 Function computing the geometric standard deviation of a numeric vector.
 
+•	*Limit_value_exceedance_plot.R*
+
+Assesses chemical concentration exceedance against a specified limit value and visualizes the results.
+
 ***Requirements***
 
 •	R version ≥ 4.5.0
