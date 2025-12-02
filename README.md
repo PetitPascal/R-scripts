@@ -119,6 +119,10 @@ Function computing the geometric standard deviation of a numeric vector.
 
 Assesses chemical concentration exceedance against a specified limit value and visualizes the results.
 
+•	*Continuous_variable_distribution_fig.R*
+
+Script for visualizing continuous variable distributions with multiple plot types.
+
 ***Requirements***
 
 •	R version ≥ 4.5.0
