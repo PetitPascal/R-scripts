@@ -107,6 +107,14 @@ Initial attempt to estimate energy consumption and carbon emissions from running
 
 Creates random assignments for experiments (e.g., clinical trial).
 
+•	*gmean.R*
+
+Function computing the geometric mean of a numeric vector.
+
+•	*GSD.R*
+
+Function computing the geometric standard deviation of a numeric vector.
+
 ***Requirements***
 
 •	R version ≥ 4.5.0
