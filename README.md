@@ -103,6 +103,10 @@ This script loads a saved model, prepares new data, and makes predictions based 
 
 Initial attempt to estimate energy consumption and carbon emissions from running R code. This function attempts to monitor CPU, RAM, and GPU usage of R code, estimate energy consumption, and calculate associated carbon emissions (gCO2).
 
+•	*Randomization.R*
+
+Creates random assignments for experiments (e.g., clinical trial).
+
 ***Requirements***
 
 •	R version ≥ 4.5.0
