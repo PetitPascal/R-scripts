@@ -1,0 +1,78 @@
+#------------------------------------------------------------------
+#### Configurations  ####
+#------------------------------------------------------------------
+
+## Installing packages if needed
+pack_needed<-c("tidyverse","scales","datasets")
+
+for (i in 1:length(pack_needed)){
+  if(pack_needed[i]%in%.packages(all.available=TRUE)){
+    #ok
+  }else{
+    install.packages(pack_needed[i],repos = "http://cran.us.r-project.org")
+  }
+}
+
+## Loading packages
+library(tidyverse)
+library(scales)
+
+#------------------------------------------------------------------
+#### Data preparation  ####
+#------------------------------------------------------------------
+
+## Using the airquality dataset from the datasets package as example
+test<-as_tibble(na.omit(datasets::airquality))
+
+## Transforming the month variable into a factor
+test$Month<-factor(test$Month,levels=sort(unique(test$Month)),labels=c("May","June","July","August","September"))
+
+## Calculating summary statistics
+test<-test %>% group_by(Month) %>% summarize(median=median(Ozone),      # median
+                                             P5=quantile(Ozone,0.05),   # 5th percentile
+                                             P95=quantile(Ozone, 0.95), # 95th percentile
+                                             P99=quantile(Ozone, 0.99)) # 99th percentile
+
+#------------------------------------------------------------------
+#### Limit value exceedance assessment  ####
+#------------------------------------------------------------------
+
+## Setting a limit value for ozone concentration
+limit_value<-75
+
+## Determining if the limit value is exceeded
+test<-test %>% mutate(comp=case_when(P95>limit_value~"Yes",
+                                     P95<=limit_value&P99>limit_value~"Inconclusive",
+                                     P99<=limit_value~"No",
+                                     T~"No"))
+
+## Transforming the limit value exceedance variable into a factor
+test$comp<-factor(test$comp,levels=unique(test$comp))
+
+#------------------------------------------------------------------
+#### Plot  ####
+#------------------------------------------------------------------
+
+test %>% ggplot() +   
+  geom_point(aes(x=Month,y=median),size=2) +
+  geom_errorbar(aes(x=Month,ymin=P95,ymax=P99))+
+  geom_crossbar(aes(x=Month, y=median,ymin = P5, ymax = P95,fill=comp),width=0.2)+
+  scale_x_discrete("Month") +
+  scale_y_log10("Ozone concentration",breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x)))+
+  scale_fill_manual("Exceedance of the limit value?",
+                    values=c("Yes"="red","No"="#009E73","Inconclusive"="gold"))+
+  geom_hline(yintercept=limit_value,linetype="dashed",col="navyblue")+
+  annotate(geom="text",x=0.5,y=limit_value*1.1,label='limit value',col="navyblue")+
+  theme_bw()+
+  theme(strip.text.x = element_text(size = 11, face="bold",colour = "black", angle = 0,margin = margin(0.3,0,0.3,0, "cm")),
+        strip.background = element_rect(fill=alpha('#009E73', 0.2),
+                                        colour="black", size=1),
+        axis.text = element_text(size=12,color="black"),
+        axis.title=element_text(size=12,face="bold",color="black"),
+        legend.text = element_text(size = 12, face = "bold"),
+        legend.title = element_text(size = 12),
+        legend.position = "bottom",
+        axis.line = element_line(color = "black",size = 0.1, linetype =
+                                   "solid"))+
+  coord_flip()
