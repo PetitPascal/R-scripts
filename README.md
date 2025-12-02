@@ -87,6 +87,10 @@ Performs a propensity score matching (PSM) analysis.
 
 Performs a Restricted Cubic Spline (RCS) analysis.
 
+•	*RCT.R*
+
+Performs a descriptive analysis, linear mixed effect models (continuous variables), logistic mixed effect models (binary variables), and cumulative link mixed effect models (ordinal variables) for analyzing randomized controlled trial (RCT) data.
+
 •	*Convert_semi transparent color to opaque.R*
 
 This function converts a semi-transparent color to its opaque equivalent, considering the visual effect on a white background.
