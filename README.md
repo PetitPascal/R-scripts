@@ -157,16 +157,18 @@ All scripts are provided to promote transparency and reproducibility in data ana
 
 If you use or adapt these scripts in your own work, please cite the corresponding release DOI:
 
-Cite as:
+Cite as (examples):
 
 •	Petit, P. (2025). Collection of reproducible data analysis scripts in R (Version v1.0.1). [R]. Zenodo.
 https://doi.org/10.5281/zenodo.17047856.
 
-•	Petit, P. (2025). Weighted survival XGBoot with R [R script]. In R-scripts (Version 1.0.0) [R]. Zenodo. https://doi.org/10.5281/zenodo.17047856. 
+•	Petit, P. (2025). Weighted survival XGBoot with R [R script]. In R-scripts (Version 1.0.0) [R]. Zenodo. https://zenodo.org/records/17752875.
 
-•	Petit, P. (2025). Logistic Bayesian Model Averaging (BMA) analysis for probabilistic model selection in logistic regression [R script]. In R-scripts (Version 1.0.1) [R]. Zenodo. https://doi.org/10.5281/zenodo.17047856.
+•	Petit, P. (2025). Logistic Bayesian Model Averaging (BMA) analysis for probabilistic model selection in logistic regression [R script]. In R-scripts (Version 1.0.1) [R]. Zenodo. https://zenodo.org/records/17752875.
 
-•	Petit, P. (2025). Extreme Gradient Boosting (XGBoost) for binary classification with nested cross-validation [R script]. In R-scripts (Version 1.0.1) [R]. Zenodo. https://doi.org/10.5281/zenodo.17047856.
+•	Petit, P. (2025). Extreme Gradient Boosting (XGBoost) for binary classification with nested cross-validation [R script]. In R-scripts (Version 1.0.1) [R]. Zenodo. https://zenodo.org/records/17752875.
+
+•	Petit, P. (2025). Bayesian kernel machine regression (BKMR) analysis [R script]. In R-scripts (Version 1.0.2) [R]. Zenodo. https://zenodo.org/records/17752875.
 
 ***Version History***
 
@@ -184,7 +186,7 @@ These scripts have been developed to support analyses in the following works:
 
 •	Petit P, Berger F, Bonneterre V, Vuillerme N. Exploring Alzheimer's Disease Risk Factors in Farmers with Explainable Machine Learning and Administrative Health Data. Submitted.
 
-•	Petit P, Berger F, Bonneterre V, Vuillerme N. Leveraging Machine Learning with Real-World Data to Identify Risk Factors in Parkinson’s Disease among Farmers. Submitted.
+•	Petit P, Berger F, Bonneterre V, Vuillerme N. Leveraging Machine Learning with Real-World Data to Identify exposomic Risk Factors in Parkinson’s Disease among Farmers. Submitted.
 
 •	Petit P, Bonneterre V, Vuillerme N. Using Machine Learning and Nationwide Population-based Data to Unravel Predictors of Treated Depression in Farmers. Ment Illn. 2025;2025:17. doi: 10.1155/mij/5570491.
 
