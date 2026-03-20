@@ -14,6 +14,10 @@ for (i in 1:length(pack_needed)){
   }
 }
 
+if(!("ggkm"%in%.packages(all.available=TRUE))){
+  devtools::install_github("sachsmc/ggkm", force = TRUE)
+}
+
 ## Package loading
 library(mgcv)
 library(quantreg)
@@ -32,6 +36,7 @@ library(factoextra)
 library(pec)
 library(xgboost)
 library(here)
+library(ggkm)
 
 ## Preventing package conflicts
 conflict_prefer("select", "dplyr") 
@@ -481,17 +486,17 @@ for(n_var in 1:length(var_test)){
   
   cox_model<-coxph(Surv(time, status) ~ tmp, data = test_tmpo)
   mod_res<-broom::tidy(cox_model,exponentiate=T,conf.int=T) %>%
-           mutate(term=var_test[n_var],
-                  direction=case_when(conf.low>1~"positive association",
-                                      conf.high<1~"negative association",
-                                      T~"uncertain association")) %>% 
-           bind_cols(broom::glance(cox_model)) %>%
-           rowwise %>% 
-           mutate_if(is.numeric,test_format) %>%
-           ungroup %>%
-           mutate(HR=paste(estimate," [",conf.low,"; ",conf.high,"]",sep="")) %>%
-           mutate(HR=if_else(HR==" [; ]","",HR))
-
+    mutate(term=var_test[n_var],
+           direction=case_when(conf.low>1~"positive association",
+                               conf.high<1~"negative association",
+                               T~"uncertain association")) %>% 
+    bind_cols(broom::glance(cox_model)) %>%
+    rowwise %>% 
+    mutate_if(is.numeric,test_format) %>%
+    ungroup %>%
+    mutate(HR=paste(estimate," [",conf.low,"; ",conf.high,"]",sep="")) %>%
+    mutate(HR=if_else(HR==" [; ]","",HR))
+  
   Cox_tab_res<-bind_rows(Cox_tab_res,mod_res)
   
 }
@@ -517,8 +522,8 @@ risk_df$sex_age <- as.factor(risk_df$sex_age)
 
 # Creating risk tertile groups
 risk_df <- risk_df %>%
-           mutate(risk_group = ntile(risk_score, 3)) %>%
-           mutate(risk_group = factor(risk_group, labels = c("Low", "Medium", "High")))
+  mutate(risk_group = ntile(risk_score, 3)) %>%
+  mutate(risk_group = factor(risk_group, labels = c("Low", "Medium", "High")))
 
 #- - - - - - - - - -
 ## Computing hazard ratios
@@ -545,7 +550,7 @@ summary(cox_model_tertiles)
 # KM curve by predicted sex
 km_sex <- survfit(Surv(time, status) ~ sex, data = risk_df)
 
-# Plot
+# Plot - version 1
 survminer::ggsurvplot(
   km_sex,
   data = risk_df,
@@ -557,13 +562,48 @@ survminer::ggsurvplot(
   xlab = "Time",
   ylab = "Survival Probability")
 
+# Plot - version 2
+
+risk_df$sex<-factor(risk_df$sex,levels=c(0,1),labels=c("Male","Female"))
+
+ggplot(risk_df, aes(time = time, status = status, fill = sex, color = sex)) + geom_km() + geom_kmband() + theme_bw()+
+  scale_x_continuous("Time (years)")+
+  scale_y_continuous("Survival probability")+
+  scale_fill_manual("",values=c(Male = "#40B696", Female = "orange"))+
+  scale_color_manual("",values=c(Male = "#40B696", Female = "orange"))+
+  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
+        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y = element_text(size=16,color="black"),
+        axis.text.x = element_text(size=16,color="black"),
+        axis.title=element_text(size=16,face="bold",color="black"),
+        legend.text = element_text(size = 16, face = "bold"),
+        legend.title = element_text(size = 16, face = "bold"),
+        legend.position="top",
+        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+
+# Plot - version 3
+ggplot(risk_df, aes(time = time, status = status, fill = sex, color = sex)) + geom_km() + theme_bw()+
+  scale_x_continuous("Time (years)")+
+  scale_y_continuous("Survival probability")+
+  scale_fill_manual("",values=c(Male = "#40B696", Female = "orange"))+
+  scale_color_manual("",values=c(Male = "#40B696", Female = "orange"))+
+  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
+        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y = element_text(size=16,color="black"),
+        axis.text.x = element_text(size=16,color="black"),
+        axis.title=element_text(size=16,face="bold",color="black"),
+        legend.text = element_text(size = 16, face = "bold"),
+        legend.title = element_text(size = 16, face = "bold"),
+        legend.position="top",
+        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+
 #- - - - - - - - - -
 ## Kaplan-Meier plot by age groups
 
 # KM curve by predicted age
 km_age <- survfit(Surv(time, status) ~ age_group, data = risk_df)
 
-# Plot
+# Plot - version 1
 survminer::ggsurvplot(
   km_age,
   data = risk_df,
@@ -573,13 +613,63 @@ survminer::ggsurvplot(
   legend.title = "Age Group",
   legend.labs = c("<60", "≥60"))
 
+# Plot - version 2
+ggplot(risk_df, aes(time = time, status = status, fill = age_group, color = age_group)) + geom_km() + geom_kmband() + theme_bw()+
+  scale_x_continuous("Time (years)")+
+  scale_y_continuous("Survival probability")+
+  scale_fill_manual("Age group",values=c('≥60' = "#40B696", '<60' = "orange"))+
+  scale_color_manual("Age group",values=c('≥60' = "#40B696", '<60' = "orange"))+
+  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
+        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y = element_text(size=16,color="black"),
+        axis.text.x = element_text(size=16,color="black"),
+        axis.title=element_text(size=16,face="bold",color="black"),
+        legend.text = element_text(size = 16, face = "bold"),
+        legend.title = element_text(size = 16, face = "bold"),
+        legend.position="bottom",
+        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))+
+  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
+        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y = element_text(size=16,color="black"),
+        axis.text.x = element_text(size=16,color="black"),
+        axis.title=element_text(size=16,face="bold",color="black"),
+        legend.text = element_text(size = 16, face = "bold"),
+        legend.title = element_text(size = 16, face = "bold"),
+        legend.position="top",
+        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+
+# Plot - version 3
+ggplot(risk_df, aes(time = time, status = status, fill = age_group, color = age_group)) + geom_km() + theme_bw()+
+  scale_x_continuous("Time (years)")+
+  scale_y_continuous("Survival probability")+
+  scale_fill_manual("Age group",values=c('≥60' = "#40B696", '<60' = "orange"))+
+  scale_color_manual("Age group",values=c('≥60' = "#40B696", '<60' = "orange"))+
+  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
+        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y = element_text(size=16,color="black"),
+        axis.text.x = element_text(size=16,color="black"),
+        axis.title=element_text(size=16,face="bold",color="black"),
+        legend.text = element_text(size = 16, face = "bold"),
+        legend.title = element_text(size = 16, face = "bold"),
+        legend.position="bottom",
+        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))+
+  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
+        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y = element_text(size=16,color="black"),
+        axis.text.x = element_text(size=16,color="black"),
+        axis.title=element_text(size=16,face="bold",color="black"),
+        legend.text = element_text(size = 16, face = "bold"),
+        legend.title = element_text(size = 16, face = "bold"),
+        legend.position="top",
+        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+
 #- - - - - - - - - -
 ## Age and sex interaction
 
 # KM curve - fitting survival curve
 surv_fit_sex_age <- survfit(Surv(time, status) ~ sex_age, data = risk_df)
 
-# Plot
+# Plot - version 1
 survminer::ggsurvplot(
   fit = surv_fit_sex_age,
   data = risk_df,
@@ -591,6 +681,40 @@ survminer::ggsurvplot(
   xlab = "Time",
   ylab = "Survival probability",
   ggtheme = theme_minimal())
+
+# Plot - version 2
+risk_df$sex_age<-factor(risk_df$sex_age,levels=c("<60_0","≥60_0","<60_1","≥60_1"),labels=c("Male <60 yo","Male ≥60 yo","Female <60 yo","Female ≥60 yo"))
+
+ggplot(risk_df, aes(time = time, status = status, fill = sex_age, color = sex_age)) + geom_km() + geom_kmband() + theme_bw()+
+  scale_x_continuous("Time (years)")+
+  scale_y_continuous("Survival probability")+
+  scale_fill_manual("",values=c('Male <60 yo' = "#40B696", 'Female <60 yo' = "#F9CBC2",'Male ≥60 yo' = "#6495ED", 'Female ≥60 yo' = "orange"))+
+  scale_color_manual("",values=c('Male <60 yo' = "#40B696", 'Female <60 yo' = "#F9CBC2",'Male ≥60 yo' = "#6495ED", 'Female ≥60 yo' = "orange"))+
+  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
+        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y = element_text(size=16,color="black"),
+        axis.text.x = element_text(size=16,color="black"),
+        axis.title=element_text(size=16,face="bold",color="black"),
+        legend.text = element_text(size = 16, face = "bold"),
+        legend.title = element_text(size = 16, face = "bold"),
+        legend.position="top",
+        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+
+# Plot - version 3
+ggplot(risk_df, aes(time = time, status = status, fill = sex_age, color = sex_age)) + geom_km() +theme_bw()+
+  scale_x_continuous("Time (years)")+
+  scale_y_continuous("Survival probability")+
+  scale_fill_manual("",values=c('Male <60 yo' = "#40B696", 'Female <60 yo' = "#F9CBC2",'Male ≥60 yo' = "#6495ED", 'Female ≥60 yo' = "orange"))+
+  scale_color_manual("",values=c('Male <60 yo' = "#40B696", 'Female <60 yo' = "#F9CBC2",'Male ≥60 yo' = "#6495ED", 'Female ≥60 yo' = "orange"))+
+  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
+        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y = element_text(size=16,color="black"),
+        axis.text.x = element_text(size=16,color="black"),
+        axis.title=element_text(size=16,face="bold",color="black"),
+        legend.text = element_text(size = 16, face = "bold"),
+        legend.title = element_text(size = 16, face = "bold"),
+        legend.position="top",
+        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
 
 #- - - - - - - - - -
 ## Kaplan-Meier plot by risk tertile group
@@ -610,6 +734,39 @@ survminer::ggsurvplot(
   legend.labs = c("Low", "Medium", "High"),
   xlab = "Time",
   ylab = "Survival probability")
+
+# plot - version 2
+ggplot(risk_df, aes(time = time, status = status, fill = risk_group, color = risk_group)) + geom_km() + geom_kmband() + theme_bw()+
+  scale_x_continuous("Time (years)")+
+  scale_y_continuous("Survival probability")+
+  scale_fill_manual("",values=c(Low = "#40B696", Medium = "#F1CB0E", High = "red"))+
+  scale_color_manual("",values=c(Low = "#40B696", Medium = "#F1CB0E", High = "red"))+
+  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
+        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y = element_text(size=16,color="black"),
+        axis.text.x = element_text(size=16,color="black"),
+        axis.title=element_text(size=16,face="bold",color="black"),
+        legend.text = element_text(size = 16, face = "bold"),
+        legend.title = element_text(size = 16, face = "bold"),
+        legend.position="top",
+        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+
+
+# plot - version 3
+ggplot(risk_df, aes(time = time, status = status, fill = risk_group, color = risk_group)) + geom_km() + theme_bw()+
+  scale_x_continuous("Time (years)")+
+  scale_y_continuous("Survival probability")+
+  scale_fill_manual("",values=c(Low = "#40B696", Medium = "#F1CB0E", High = "red"))+
+  scale_color_manual("",values=c(Low = "#40B696", Medium = "#F1CB0E", High = "red"))+
+  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
+        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y = element_text(size=16,color="black"),
+        axis.text.x = element_text(size=16,color="black"),
+        axis.title=element_text(size=16,face="bold",color="black"),
+        legend.text = element_text(size = 16, face = "bold"),
+        legend.title = element_text(size = 16, face = "bold"),
+        legend.position="top",
+        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
 
 #----------------------------------------------------------------
 #### Feature importance ####
@@ -818,6 +975,126 @@ ggsave(plot2,
        dpi=600,width=60,height=30,units = "cm",limitsize=F)
 
 #- - - - - - - - - -
+## Creating a dataset with both SHAP and feature values for SHAP dependence plots
+
+# Shap values
+shap_values <- shap %>%
+  mutate(id = row_number()) %>%
+  pivot_longer(cols = -c(id), names_to = "feature", values_to = "shap_value")
+
+# Feature values
+feature_values <- test_x %>%
+  as.data.frame() %>%
+  mutate(id = row_number()) %>%
+  pivot_longer(cols = -c(id), names_to = "feature", values_to = "feature_value")
+
+# Merging shap and feature values
+shap_full <- shap_long %>% left_join(feature_values, by = c("id", "feature"))
+
+#- - - - - - - - - -
+## Dependence plot - example for a continuous variable (age)
+
+# Pulling feature values and SHAP values
+feature_vals <- shap_full %>% filter(feature == "age") %>% select(feature_value) %>% pull # feature values
+shap_vals <- shap_full %>% filter(feature == "age") %>% select(shap_value) %>% pull       # shap values
+
+gam_fit <-  mgcv::gam(shap_vals ~ s(feature_vals, bs="cs", k=10)) # GAM fitting
+
+# Generating fine grid and predicting GAM curve
+pred_grid <- seq(min(feature_vals, na.rm=T), max(feature_vals, na.rm=T), length.out=1000)
+gam_pred <- predict(gam_fit, newdata=data.frame(feature_vals=pred_grid), se.fit=T)
+
+# Finding all zero crossings on GAM curve
+zero_indices <- which(diff(sign(gam_pred$fit)) != 0)
+zero_feature_values <- pred_grid[zero_indices]
+
+breaks <- c(min(pred_grid), zero_feature_values, max(pred_grid))
+regions <- data.frame(
+  xmin = breaks[-length(breaks)],
+  xmax = breaks[-1],
+  sign = sapply(1:(length(breaks)-1), function(i) {
+    mid_pred <- mean(gam_pred$fit[pred_grid >= breaks[i] & pred_grid <= breaks[i+1]])
+    ifelse(mid_pred > 0, "positive", "negative")
+  }))
+
+# Assigning colors depending on SHAP values
+regions$color <- ifelse(regions$sign == "positive", "#F9CBC24C", "#A6DDCE4C")
+
+# Plot
+ggplot(filter(shap_full, feature == "age"),
+       aes(x = feature_value, y = shap_value)) +
+  geom_point(alpha = 0.05,col="grey50") +
+  geom_smooth(method = "gam", se = FALSE,col="black",size=2,formula = y ~ s(x, bs="cs", k=10)) +
+  geom_rect(data=regions, aes(xmin=xmin, xmax=xmax, ymin=-Inf, ymax=Inf, fill=color),
+            alpha=0.3, inherit.aes=FALSE) +
+  geom_hline(yintercept=0,linetype="dashed") +
+  geom_vline(xintercept = zero_feature_values,linetype="dashed")+
+  annotate(geom="point",x=zero_feature_values,y=0,col="orange",size=3)+
+  annotate(geom="text",x=zero_feature_values+1,y=0.4,col="black",size=7,label=signif(zero_feature_values,3),fontface="bold")+
+  scale_x_continuous("Age")+
+  scale_y_continuous("SHAP value")+
+  scale_fill_identity("", labels=c(negative="#A6DDCE4C", positive="#F9CBC24C"))+
+  theme_bw()+
+  theme(
+    strip.text.x = element_text(size = 16, colour = "black"),
+    strip.background = element_rect(fill = alpha('#009E73', 0.2), colour = "black", size = 1),
+    axis.text = element_text(size = 16, colour = "black"),
+    axis.title = element_text(size = 16, face = "bold", colour = "black"),
+    legend.text = element_text(size = 16, face = "bold"),
+    legend.title = element_blank(),
+    axis.line = element_line(colour = "black", size = 0.1, linetype = "solid"))
+
+#- - - - - - - - - -
+## Dependence plot - example for an ordinal variable (differ)
+
+shap_full<-shap_full %>% mutate(col_point=if_else(shap_value>=0,"positive","negative"))
+shap_full$col_point<-factor(shap_full$col_point,levels=c("positive","negative"))
+
+# Plot
+set.seed(123)
+ggplot(filter(shap_full, feature == "differ") %>% mutate(feature_value=as.factor(feature_value)),
+       aes(x = feature_value, y = shap_value)) +
+  # geom_violin(alpha=0.1)+ 
+  # geom_boxplot(width=0.1,alpha=0.4)+
+  geom_boxplot()+
+  geom_jitter(aes(color=col_point)) +
+  scale_color_manual("",values=c(negative="#40B696", positive="red"))+
+  geom_hline(yintercept=0,linetype="dashed") +
+  stat_summary(fun=median, geom="line", aes(group=1), linetype=1)+
+  scale_x_discrete("Differentiation of tumour")+
+  scale_y_continuous("SHAP value")+
+  theme_bw()+
+  theme(
+    strip.text.x = element_text(size = 16, colour = "black"),
+    strip.background = element_rect(fill = alpha('#009E73', 0.2), colour = "black", size = 1),
+    axis.text = element_text(size = 16, colour = "black"),
+    axis.title = element_text(size = 16, face = "bold", colour = "black"),
+    legend.position = "none",
+    axis.line = element_line(colour = "black", size = 0.1, linetype = "solid"))
+
+#- - - - - - - - - -
+## Dependence plot - example for a binary variable (sex)
+
+# Plot
+set.seed(123)
+ggplot(filter(shap_full, feature == "sex") %>% mutate(feature_value=as.factor(feature_value)),
+       aes(x = feature_value, y = shap_value)) +
+  geom_boxplot()+
+  geom_jitter(aes(color=col_point)) +
+  scale_color_manual("",values=c(negative="#40B696", positive="red"))+
+  geom_hline(yintercept=0,linetype="dashed") +
+  scale_x_discrete("Sex")+
+  scale_y_continuous("SHAP value")+
+  theme_bw()+
+  theme(
+    strip.text.x = element_text(size = 16, colour = "black"),
+    strip.background = element_rect(fill = alpha('#009E73', 0.2), colour = "black", size = 1),
+    axis.text = element_text(size = 16, colour = "black"),
+    axis.title = element_text(size = 16, face = "bold", colour = "black"),
+    legend.position = "none",
+    axis.line = element_line(colour = "black", size = 0.1, linetype = "solid"))
+
+#- - - - - - - - - -
 ## SHAP and Cox comparison
 
 tmp_Cox<-Cox_tab_res %>% select(term,HR,direction,concordance,p.value.log)
@@ -859,6 +1136,3 @@ fwrite(shap_score_sub,paste("shap_score_sub_",Sys.Date(),".txt",sep=""), sep = "
 
 # SHAP and Cox comparison
 fwrite(Compa_Cox_SHAP,paste("Compa_Cox_SHAP_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
-
-
-
