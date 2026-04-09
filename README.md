@@ -31,6 +31,10 @@ Implementation of Extreme Gradient Boosting (XGBoost) adapted for Cox proportion
 
 Implements XGBoost for binary classification tasks with nested cross-validation, allowing for robust model evaluation and hyperparameter tuning.
 
+•	*XGBoost_binary classification_k-fold nested CV.R*
+
+Implements XGBoost for binary classification tasks with 50x repeated 5-fold nested cross-validation, allowing for robust model evaluation and hyperparameter tuning.
+
 •	*XGBoost_linear regression_nested CV.R*
 
 Implements XGBoost for linear regression task with nested cross-validation, allowing for robust model evaluation and hyperparameter tuning.
