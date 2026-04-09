@@ -68,32 +68,36 @@ var_type_tab<-as_tibble(data.frame(feature=colnames(clean_data),
 #### Feature selection ####
 
 ## Identifying and removing collinear variables
-collinear<-usdm::vifstep(as.data.frame(clean_data %>% select(-outcome)),th=2.5)
+VIF_threshold<-2.5 # user choice
+collinear<-usdm::vifstep(as.data.frame(clean_data %>% select(-outcome)),th=VIF_threshold)
 clean_data<-clean_data %>% select(colnames(clean_data)[which(colnames(clean_data) %ni% c(collinear@excluded))])
+selected_vars<-colnames(clean_data)[-which(colnames(clean_data)=="outcome")]
 
-## Regularization methods (LASSO: L1-penalized linear regression) to do feature selection and shrinkage simultaneously
-
-# Preparing the data for LASSO
-X <- as.matrix(clean_data %>% select(-outcome))
-y <- clean_data$outcome
-
-# Fitting LASSO linear regression with cross-validation to select lambda
-set.seed(12345)
-cvfit <- cv.glmnet(X, y, family = "gaussian", alpha = 1, nfolds = 5)
-
-# Identifying lambda with minimum cross-validated error
-best_lambda <- cvfit$lambda.min
-
-# Fitting final model at best lambda
-set.seed(12345)
-lasso_model <- glmnet(X, y, family = "gaussian", alpha = 1, lambda = best_lambda)
-
-# Extracting coefficients (nonzero are selected variables)
-coef_selected <- coef(lasso_model)
-
-# Identifying features to include in the BMA analysis
-selected_vars <- rownames(coef_selected)[which(coef_selected[,1] != 0)]
-selected_vars <- selected_vars[selected_vars != "(Intercept)"]
+#----------------------------------------------------------------
+### To run only if needed
+### Regularization methods (LASSO: L1-penalized linear regression) to do feature selection and shrinkage simultaneously
+#
+## Preparing the data for LASSO
+#X <- as.matrix(clean_data %>% select(-outcome))
+#y <- clean_data$outcome
+#
+## Fitting LASSO linear regression with cross-validation to select lambda
+#set.seed(12345)
+#cvfit <- cv.glmnet(X, y, family = "gaussian", alpha = 1, nfolds = 5)
+#
+## Identifying lambda with minimum cross-validated error
+#best_lambda <- cvfit$lambda.min
+#
+## Fitting final model at best lambda
+#set.seed(12345)
+#lasso_model <- glmnet(X, y, family = "gaussian", alpha = 1, lambda = best_lambda)
+#
+## Extracting coefficients (nonzero are selected variables)
+#coef_selected <- coef(lasso_model)
+#
+## Identifying features to include in the BMA analysis
+#selected_vars <- rownames(coef_selected)[which(coef_selected[,1] != 0)]
+#selected_vars <- selected_vars[selected_vars != "(Intercept)"]
 
 #----------------------------------------------------------------
 #### BMA analysis ####
