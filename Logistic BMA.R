@@ -68,37 +68,41 @@ var_type_tab<-as_tibble(data.frame(feature=colnames(clean_data),
 #### Feature selection ####
 
 ## Identifying and removing collinear variables
-collinear<-usdm::vifstep(as.data.frame(clean_data %>% select(-outcome)),th=2.5)
+VIF_threshold<-2.5 # user choice
+collinear<-usdm::vifstep(as.data.frame(clean_data %>% select(-outcome)),th=VIF_threshold)
 clean_data<-clean_data %>% select(colnames(clean_data)[which(colnames(clean_data) %ni% c(collinear@excluded))])
+selected_vars<-colnames(clean_data)[-which(colnames(clean_data)=="outcome")]
 
 ## Transforming ordinal variables in ordered factors
 clean_data$rx <- factor(clean_data$rx,levels = sort(unique(clean_data$rx)),ordered = TRUE)
 clean_data$differ <- factor(clean_data$differ,levels = sort(unique(clean_data$differ)),ordered = TRUE)
 clean_data$extent <- factor(clean_data$extent,levels = sort(unique(clean_data$extent)),ordered = TRUE)
 
-## Regularization methods (LASSO: L1-penalized logistic regression) to do feature selection and shrinkage simultaneously
-
-# Preparing the data for LASSO
-X <- as.matrix(clean_data %>% select(-outcome))
-y <- clean_data$outcome
-
-# Fitting LASSO logistic regression with cross-validation to select lambda
-set.seed(12345)
-cvfit <- cv.glmnet(X, y, family = "binomial", alpha = 1, nfolds = 5)
-
-# Identifying lambda with minimum cross-validated error
-best_lambda <- cvfit$lambda.min
-
-# Fitting final model at best lambda
-set.seed(12345)
-lasso_model <- glmnet(X, y, family = "binomial", alpha = 1, lambda = best_lambda)
-
-# Extracting coefficients (nonzero are selected variables)
-coef_selected <- coef(lasso_model)
-
-# Identifying features to include in the BMA analysis
-selected_vars <- rownames(coef_selected)[which(coef_selected[,1] != 0)]
-selected_vars <- selected_vars[selected_vars != "(Intercept)"]
+#----------------------------------------------------------------
+### To run only if needed
+### Regularization methods (LASSO: L1-penalized logistic regression) to do feature selection and shrinkage simultaneously
+#
+## Preparing the data for LASSO
+#X <- as.matrix(clean_data %>% select(-outcome))
+#y <- clean_data$outcome
+#
+## Fitting LASSO logistic regression with cross-validation to select lambda
+#set.seed(12345)
+#cvfit <- cv.glmnet(X, y, family = "binomial", alpha = 1, nfolds = 5)
+#
+## Identifying lambda with minimum cross-validated error
+#best_lambda <- cvfit$lambda.min
+#
+## Fitting final model at best lambda
+#set.seed(12345)
+#lasso_model <- glmnet(X, y, family = "binomial", alpha = 1, lambda = best_lambda)
+#
+## Extracting coefficients (nonzero are selected variables)
+#coef_selected <- coef(lasso_model)
+#
+## Identifying features to include in the BMA analysis
+#selected_vars <- rownames(coef_selected)[which(coef_selected[,1] != 0)]
+#selected_vars <- selected_vars[selected_vars != "(Intercept)"]
 
 #----------------------------------------------------------------
 #### BMA analysis ####
@@ -161,6 +165,7 @@ write.table(comparison_table,paste("Table_determinants_",Sys.Date(),".csv"),sep=
 
 ## Plotting BMA results
 plot_df <- comparison_table %>%
+  filter(post_prob>0) %>%
   pivot_longer(cols = c(mean_top, mean_top5, mean_BMA),
                names_to = "ModelType",
                values_to = "Coefficient")
@@ -228,7 +233,8 @@ ggsave(plot3,
 ## Plotting the radar chart
 
 # Selecting determinants
-BMA_radar<-comparison_table %>% select(feature) 
+PIP_threshold<-50 # user choice
+BMA_radar<-comparison_table %>% filter(post_prob>=PIP_threshold) %>% select(feature) 
 var_select<-BMA_radar$feature
 
 # Calculating the proportion for categorical variables or the median of the normalized values for ordinal or continuous variables of each group
@@ -305,8 +311,7 @@ radarchart(tempo,
            axislabcol="black",
            cglwd=0.8,
            vlcex=1.25,
-           maxmin=T
-           # centerzero=T)
+           maxmin=T)
 
 legend(x=1.25, y=1.25,
        legend = c("group 1",
