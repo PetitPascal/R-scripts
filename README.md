@@ -186,7 +186,7 @@ https://doi.org/10.5281/zenodo.17047856.
 
 These scripts have been developed to support analyses in the following works:
 
-•	Petit P, Nübel J, Walter J, Butter C, Heinze M, Ignatyev J, Haase-Fielitz A, Vuillerme N, Muehlensiepen F. Telemedicine adoption in cardiology: determinants and predictors identified using Bayesian model averaging and machine learning. PLOS Digital Health. 2026. Accepted.
+•	Petit P, Nübel J, Walter J, Butter C, Heinze M, Ignatyev J, Haase-Fielitz A, Vuillerme N, Muehlensiepen F. Telemedicine adoption in cardiology: determinants and predictors identified using Bayesian model averaging and machine learning. PLOS Digit Health. 2026;5(4):e0001359. doi: 10.1371/journal.pdig.0001359.
 
 •	Petit P, Berger F, Bonneterre V, Vuillerme N. Exploring Alzheimer's Disease Risk Factors in Farmers with Explainable Machine Learning and Administrative Health Data. Submitted.
 
