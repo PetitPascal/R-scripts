@@ -515,9 +515,6 @@ for (r in 1:n_repeats) {
 #- - - - - - - - - -
 ## Combining all folds and repeats
 shap_all <- rbindlist(shap_list)
-colnames(nomenclature2)[1]<-"feature"
-shap_all<-left_join(shap_all,nomenclature2,by=base::intersect(colnames(shap_all),colnames(nomenclature2)))
-shap_all<-shap_all %>% mutate(feature=Def)
 
 #- - - - - - - - - -
 ## Computing summary statistics per feature
@@ -574,8 +571,8 @@ plot_errorbar <- ggplot(shap_summary, aes(y = feature, x = mean_abs_shap, color 
   scale_x_continuous("mean |SHAP value|", labels = function(x) abs(x))+
   geom_text(aes(x=CI_97.5+pos,y=feature,label=label_shap),size=5)+
   scale_color_manual("Direction:",
-                     values = c("limiting factor" = "#C35C33",
-                                "promoting factor" = "#40B696",
+                     values = c("promoting predictor" = "#C35C33",
+                                "mitigating predictor" = "#40B696",
                                 "neutral" = "black")) +
   theme_bw() +
   theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
@@ -603,8 +600,8 @@ plot_bar <- ggplot(shap_summary, aes(y = feature, x = mean_abs_shap, fill = dire
             size=6,position=position_nudge(x = if_else(shap_summary$mean_abs_shap>=0,0.2,-0.2)))+
   scale_x_continuous("mean |SHAP value|", labels = function(x) abs(x)) +
   scale_fill_manual("Direction:",
-                    values = c("promoting factor" = "#A6DDCE",
-                               "limiting factor" = "#F9CBC2",
+                    values = c("mitigating predictor" = "#A6DDCE",
+                               "promoting predictor" = "#F9CBC2",
                                "neutral" = "white")) +
   theme_bw() +
   theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
