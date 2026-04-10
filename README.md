@@ -239,4 +239,4 @@ email: pascal.petit@univ-grenoble-alpes.fr
 •	CHU Grenoble Alpes, Centre Régional de Pathologies Professionnelles et Environnementales, 38000 Grenoble, France
 
 ---
-If you find these models useful, please star this repository and cite the DOI in your research!
+If you find these scripts useful, please star this repository and cite the DOI in your research!
