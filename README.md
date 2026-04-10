@@ -208,7 +208,7 @@ These scripts have been developed to support analyses in the following works:
 
 ***Contact***
 
-For questions regarding the models or associated studies:
+For questions regarding the scripts or associated studies:
 
 **Pascal Petit**
 
