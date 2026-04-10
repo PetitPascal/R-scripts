@@ -186,11 +186,13 @@ https://doi.org/10.5281/zenodo.17047856.
 
 These scripts have been developed to support analyses in the following works:
 
-•	Petit P, Nübel J, Walter J, Butter C, Heinze M, Ignatyev J, Haase-Fielitz A, Vuillerme N, Muehlensiepen F. Predicting telemedicine use among healthcare professionals in cardiology: a Bayesian model averaging and machine learning analysis of German survey data. Submitted.
+•	Petit P, Nübel J, Walter J, Butter C, Heinze M, Ignatyev J, Haase-Fielitz A, Vuillerme N, Muehlensiepen F. Telemedicine adoption in cardiology: determinants and predictors identified using Bayesian model averaging and machine learning. PLOS Digital Health. 2026. Accepted.
 
 •	Petit P, Berger F, Bonneterre V, Vuillerme N. Exploring Alzheimer's Disease Risk Factors in Farmers with Explainable Machine Learning and Administrative Health Data. Submitted.
 
 •	Petit P, Berger F, Bonneterre V, Vuillerme N. Leveraging Machine Learning with Real-World Data to Identify exposomic Risk Factors in Parkinson’s Disease among Farmers. Submitted.
+
+•	Petit P, Vuillerme N, Gehrmann J, Stephan J, Muehlensiepen F, Nübel J, Hahn F, Martens E. Leveraging Machine Learning with Real-World Data to Identify exposomic Risk Factors in Parkinson’s Disease among Farmers. Submitted.
 
 •	Petit P, Bonneterre V, Vuillerme N. Using Machine Learning and Nationwide Population-based Data to Unravel Predictors of Treated Depression in Farmers. Ment Illn. 2025;2025:17. doi: 10.1155/mij/5570491.
 
@@ -225,6 +227,7 @@ email: pascal.petit@univ-grenoble-alpes.fr
 •	*Thèse.fr*: https://theses.fr/223750166
 
 ***Current affiliation***: Univ. Grenoble Alpes, CNRS, Grenoble INP*, LIG, 38000 Grenoble, France
+
 *Institute of Engineering Univ. Grenoble Alpes
 
 ***Former affiliations***:
