@@ -6,6 +6,8 @@ This repository provides a curated collection of R scripts designed to support r
 
 The scripts have been developed and used in several of my publications and cover a range of analytical approaches including survival analysis, Bayesian model averaging, and machine learning methods such as Extreme Gradient Boosting (XGBoost).
 
+---
+
 ***Overview***
 
 The primary goal of this repository is to promote transparency, reproducibility, and reusability of statistical analyses.
@@ -20,6 +22,7 @@ Each script is fully documented and includes, where applicable:
 
 Researchers and users are encouraged to adapt these scripts for their own data and workflows.
 
+---
 
 ***Contents***
 
@@ -127,11 +130,15 @@ Assesses chemical concentration exceedance against a specified limit value and v
 
 Script for visualizing continuous variable distributions with multiple plot types.
 
+---
+
 ***Requirements***
 
 •	R version ≥ 4.5.0
 
 •	Additional dependencies are listed in the header of each script.
+
+---
 
 ***Usage***
 1.	Clone or download this repository:
@@ -144,6 +151,8 @@ Script for visualizing continuous variable distributions with multiple plot type
 4.	Load the desired script and follow the inline documentation and example usage.
    
 5.	Ensure all required packages are installed before running the scripts.
+
+---
 
 ***Reproducibility and citation***
 
@@ -174,6 +183,8 @@ https://doi.org/10.5281/zenodo.17047856.
 
 •	Petit, P. (2025). Bayesian kernel machine regression (BKMR) analysis [R script]. In R-scripts (Version 1.0.2) [R]. Zenodo. https://zenodo.org/records/17752875.
 
+---
+
 ***Version History***
 
 •	v1.0.0:	Initial release -	XGBoost for Cox proportional hazards modeling
@@ -181,6 +192,8 @@ https://doi.org/10.5281/zenodo.17047856.
 •	v1.0.1:	Update release	- Added Logistic BMA and XGBoost (binary classification with nested CV)
 
 •	v1.0.2:	Update release	- Added several new scripts
+
+---
 
 ***Related Publications***
 
@@ -237,6 +250,16 @@ email: pascal.petit@univ-grenoble-alpes.fr
 •	Univ. Grenoble Alpes, CNRS, UMR 5525, VetAgro Sup, Grenoble INP, TIMC, 38000 Grenoble, France
                       
 •	CHU Grenoble Alpes, Centre Régional de Pathologies Professionnelles et Environnementales, 38000 Grenoble, France
+
+---
+My research has been partially supported by:
+
+•	The French government, through the National Research Agency (ANR - Agence Nationale de la Recherche), under the *France 2030* program (MIAI Cluster), grant **ANR-23-IACL-0006** (February 2025 – present).
+•	The French government, through the ANR, under the *Investissements d’avenir* program, grants **ANR-10-AIRT-0005** and **ANR-15-IDEX-0002** (September 2022 – April 2026).
+•	The *Agence nationale de sécurité sanitaire de l’alimentation, de l’environnement et du travail* (ANSES), grants **2016-CRD-03_PPV16/534B** and **2018-CRD-14_PPV18** (October 2018 – December 2020).
+•	*Mutualité Sociale Agricole* (MSA), grant **MSA-2020-STOP** (January 2021 – December 2022).
+•	*Fondation pour la Recherche sur Alzheimer*, grant **2020-A-01** (January 2021 – December 2021).
+•	*MIAI@Grenoble Alpes*, grant **ANR-19-P3IA-0003** (October 2018 – January 2025).
 
 ---
 If you find these scripts useful, please star this repository and cite the DOI in your research!
