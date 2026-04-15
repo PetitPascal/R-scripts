@@ -205,7 +205,7 @@ These scripts have been developed to support analyses in the following works:
 
 •	Petit P, Berger F, Bonneterre V, Vuillerme N. Leveraging Machine Learning with Real-World Data to Identify exposomic Risk Factors in Parkinson’s Disease among Farmers. Submitted.
 
-•	Petit P, Vuillerme N, Gehrmann J, Stephan J, Muehlensiepen F, Nübel J, Hahn F, Martens E. Leveraging Machine Learning with Real-World Data to Identify exposomic Risk Factors in Parkinson’s Disease among Farmers. Submitted.
+•	Petit P, Vuillerme N, Gehrmann J, Stephan J, Muehlensiepen F, Nübel J, Hahn F, Martens E. Determinants and predictors of telemedicine use among physicians in the German outpatient sector: a secondary analysis of a web-based survey. Submitted.
 
 •	Petit P, Bonneterre V, Vuillerme N. Using Machine Learning and Nationwide Population-based Data to Unravel Predictors of Treated Depression in Farmers. Ment Illn. 2025;2025:17. doi: 10.1155/mij/5570491.
 
