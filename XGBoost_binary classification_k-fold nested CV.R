@@ -356,7 +356,7 @@ for (r in 1:n_repeats) {
       min_child_weight = c(1, 5, 10),
       learning_rate = c(0.05, 0.01, 0.3),
       max_depth = c(3, 5, 7),
-      scale_pos_weight = weight) %>% dplyr::slice_sample(n = 20)
+      scale_pos_weight = weight) %>% dplyr::slice_sample(n = 30)
     
     best_auc <- -Inf
     best_params <- NULL
