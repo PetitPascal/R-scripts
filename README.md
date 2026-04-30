@@ -205,13 +205,7 @@ These scripts have been developed to support analyses in the following works:
 
 •	Petit P, Nübel J, Walter J, Butter C, Heinze M, Ignatyev J, Haase-Fielitz A, Vuillerme N, Muehlensiepen F. Telemedicine adoption in cardiology: determinants and predictors identified using Bayesian model averaging and machine learning. PLOS Digit Health. 2026;5(4):e0001359. doi: 10.1371/journal.pdig.0001359.
 
-•	Petit P, Berger F, Bonneterre V, Vuillerme N. Exploring Alzheimer's Disease Risk Factors in Farmers with Explainable Machine Learning and Administrative Health Data. Submitted.
-
-•	Petit P, Berger F, Bonneterre V, Vuillerme N. Leveraging Machine Learning with Real-World Data to Identify exposomic Risk Factors in Parkinson’s Disease among Farmers. Submitted.
-
 •	Petit P, Vuillerme N, Gehrmann J, Stephan J, Muehlensiepen F, Nübel J, Hahn F, Martens E. Determinants and predictors of telemedicine use among physicians in the German outpatient sector: a secondary analysis of a web-based survey. Submitted.
-
-•	Petit P, Bonneterre V, Vuillerme N. Using Machine Learning and Nationwide Population-based Data to Unravel Predictors of Treated Depression in Farmers. Ment Illn. 2025;2025:17. doi: 10.1155/mij/5570491.
 
 •	Muehlensiepen F, Petit P, Knitza J, Welcker M, Vuillerme N. Prediction of the acceptance of telemedicine among rheumatic patients. A machine learning powered secondary analysis of German survey data. Rheumatol Int. 2024;44(3):523-534. doi: 10.1007/s00296-023-05518-9.
 
@@ -220,6 +214,20 @@ These scripts have been developed to support analyses in the following works:
 •	Muehlensiepen F, Petit P, Knitza J, Welcker M, Vuillerme N. Factors Associated With Telemedicine Use Among Patients With Rheumatic and Musculoskeletal Disease: Secondary Analysis of Data From a German Nationwide Survey. J Med Internet Res. 2023;25:e40912. doi: 10.2196/40912.
 
 •	Muehlensiepen F, Petit P, Knitza J, Welcker M, Vuillerme N. Factors associated with Telemedicine Usage among German General Practitioners and Rheumatologists: Secondary Analysis of Data from a Nationwide Survey. J Med Internet Res. 2022;24(11):e40304. doi: 10.2196/40304.
+
+•	Muehlensiepen F, May S, Seifert F, Wengemuth E, Johannsen O, Middeke M, Heinze M, Petit P, Vuillerme N, Spethmann S, Bruch D. User Profiles and Engagement in a Hypertension Self-Management App: Cross-Sectional Survey. J Med Internet Res. 2026;28:e83075. doi: 10.2196/83075.
+
+•	May S, Darkow R, Knitza J, Boy K, Klemm P, Heinze M, Vuillerme N, Petit P, Steffens-Korbanka P, Kladny H, Hornig J, Aries P, Welcker M, Muehlensiepen F. Digital Transformation of Rheumatology Care in Germany: Cross-Sectional National Survey. J Med Internet Res. 2025;27:e52601. doi: 10.2196/52601.
+
+•	Grube L, Petit P, Vuillerme N, Nitschke M, Nwosu OB, Knitza J, Krusche M, Seifer AK, Eskofier BM, Schett G, Morf H. Complementary App-based Yoga Home Exercise Therapy for patients with axial Spondyloarthritis: A Usability Study. JMIR Form Res. 2024;8:e57185. doi: 10.2196/57185. 
+
+•	Blaskowitz PPVA et al. Impact of the digital health application ViViRA on spinal mobility, physical function, quality of life and pain perception in spondyloarthritides patients: a randomized controlled trial. Arthritis Res Ther. 2024. 2024;26(1):208. doi: 10.1186/s13075-024-03443-1.
+
+•	Petit P, Berger F, Bonneterre V, Vuillerme N. Exploring Alzheimer's Disease Risk Factors in Farmers with Explainable Machine Learning and Administrative Health Data. Submitted.
+
+•	Petit P, Berger F, Bonneterre V, Vuillerme N. Leveraging Machine Learning with Real-World Data to Identify exposomic Risk Factors in Parkinson’s Disease among Farmers. Submitted.
+
+•	Petit P, Bonneterre V, Vuillerme N. Using Machine Learning and Nationwide Population-based Data to Unravel Predictors of Treated Depression in Farmers. Ment Illn. 2025;2025:17. doi: 10.1155/mij/5570491.
 
 •	Petit P, Berger F, Bonneterre V, Vuillerme N. Investigating Parkinson’s disease risk across farming activities using data mining and large-scale administrative health data. npj Parkinsons Dis. 2025;11:13. doi: 10.1038/s41531-024-00864-2.
 
@@ -232,6 +240,42 @@ These scripts have been developed to support analyses in the following works:
 •	Petit P, Gandon G, Dubuc M, Vuillerme N, Bonneterre V. Agricultural activities and risk of treatment for depressive disorders among the entire French agricultural workforce: the TRACTOR project, a nationwide retrospective cohort study. Lancet Reg Health Eur. 2023;31:100674. doi: 10.1016/j.lanepe.2023.100674.
 
 •	Petit P, Gandon G, Chabardes S, Bonneterre V. Agricultural activities and risk of central nervous system tumors among French farm managers: results from the TRACTOR project. Int J Cancer. 2022;151(10):1737-1749. doi: 10.1002/ijc.34197.
+
+• Petit P, Bosson-Rieutort D, Maugard C, Gondard E, Ozenfant D, Joubert N, François O, Bonneterre V. The TRACTOR Project: TRACking and MoniToring Occupational Risks in Agriculture Using French Insurance Health Data (MSA). Ann Work Expo Health. 2022;66(3);402-411. doi: 10.1093/annweh/wxab083.
+
+•	Chamot S, Petit P, Al-Salameh A, Bonneterre V, Cancé C, Decocq G, Desailloud R. Environmental Pollution and the Risk of Congenital Hypothyroidism: Insights from a French Nationwide Retrospective Ecological Cohort Study. J Hazard Mater Adv. 2025;17:100560. doi : 10.1016/j.hazadv.2024.100560.
+
+•	Chamot S, Al-Salameh A, Balcaen T, Petit P, Bonneterre V, Cancé C, Desailloud R. Congenital and acquired hypothyroidism: temporal and spatial trends in France from 2014 to 2019. Ann Epidemiol. 2024;98:18-24. doi: 10.1016/j.annepidem.2024.07.091.
+
+•	Chamot S, Al-Salameh A, Petit P, Bonneterre V, Cancé C, Decocq G, Boullier A, Braun K, Desailloud R. Does prenatal exposure to multiple airborne and tap-water pollutants increase neonatal thyroid-stimulating hormone concentrations? Data from the Picardy region, France. Sci Tot Environ. 2023;905:167089. doi: 10.1016/j.scitotenv.2023.167089.
+
+•	Aix ML, Petit P, Bicout DJ. Air pollution and health impacts during the COVID-19 lockdowns in Grenoble, France. Environ Pollut. 2022;303:119134. doi: 10.1016/j.envpol.2022.119134.
+
+•	Clauzel A, Persoons R, Maître A, Balducci F, Petit P. Review of environmental airborne pyrene/benzo[a]pyrene levels from industrial emissions for the improvement of 1-hydroxypyrene biomonitoring interpretation. J Toxicol Environ Health B Crit Rev. 2024;27(5-6):1-21. doi: 10.1080/10937404.2024.2362632.
+
+• Valière M, Petit P, Persoons R, Demeilliers C, Maître A. Consistency between air and biological monitoring for assessing polycyclic aromatic hydrocarbon exposure and cancer risk of workers. Environ Res. 2022;112268. doi: 10.1016/j.envres.2021.112268. 
+
+•	Petit P, Bicout DJ. Health risk assessment with multiple reference indices. Sci Total Environ. 2022;804:149971. doi: 10.1016/j.scitotenv.2021.149971.
+
+•	Petit P, Maître A, Bicout D. A consensus approach for estimating health risk: application to inhalation cancer risks. Environ Res. 2021;196:110436. doi: 10.1016/j.envres.2020.110436.
+
+•	Petit P, Maître A, Persoons R, Bicout DJ. Lung cancer risk assessment for workers exposed to polycyclic aromatic hydrocarbons in various industries. Environ Int. 2019;124:109-120. doi: 10.1016/j.envint.2018.12.058.
+
+•	Petit P, Maître A, Persoons R, Bicout DJ. Modeling the exposure functions of atmospheric polycyclic aromatic hydrocarbon mixtures in occupational environments. Sci Tot Environ. 2017;584-585:1185-1197. doi: 10.1016/j.scitotenv.2017.01.182.
+
+•	Petit P, Bicout DJ, Persoons R, Bonneterre V, Barbeau D, Maître A. Constructing a database of similar exposure groups: the application of the Exporisq-HAP database from 1995 to 2015. Ann Work Expo Health. 2017;61(4):440-456. doi: 10.1093/annweh/wxx017.
+
+•	Maître A, Petit P, Marques M, Hervé C, Montlevier S, Persoons R, Bicout DJ. Exporisq-HAP database: 20 years of monitoring French occupational exposure to polycyclic aromatic hydrocarbon mixtures and identification of exposure determinants. Int J Hyg Environ Health. 2018;221(2):334-346. doi: 10.1016/j.ijheh.2017.12.008.
+
+•	Petit P. Toxicological and Exposure Database Inventory: a review. Int J Hyg Environ Health. 2022;246:114055. doi: 10.1016/j.ijheh.2022.114055.
+
+•	Choueiri J, Petit P, Balducci F, Bicout DJ, Demeilliers C. Literature-based inventory of chemical substance concentrations measured in organic food consumed in Europe. Data. 2024;9(7):89. doi: 10.3390/data9070089.
+
+•	Milane T, Vuillerme N, Petit P, Warmerdam E, Romijnders R, Bianchini E, Maetzler W, Hansen C. Impact of forward and backward walking on gait parameters across Parkinson’s disease stages and severity: a prospective observational study. BMC Neurol. 2025;29(1):379. doi : 10.1186/s12883-025-04321-2.
+
+•	Chardon M, Barbieri FA, Hansen C, Petit P, Vuillerme N. Impact of Overweight on Spatial-Temporal Gait Parameters During Obstacle Crossing in Young Adults: A Cross-Sectional Study. Sensors. 2024;24(23):7867. doi: 10.3390/s24237867.
+
+•	Chardon M, Barbieri FA, Petit P, Vuillerme N. Reliability of obstacle-crossing parameters during overground walking in young adults. Sensors. 2024;24(11):3387. doi: 10.3390/s24113387.
 
 ---
 
