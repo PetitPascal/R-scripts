@@ -26,6 +26,10 @@ Researchers and users are encouraged to adapt these scripts for their own data a
 
 ***Contents***
 
+•	*Cox proportional hazards regression.R*
+
+Implementation of a comprehensive Cox proportional hazards regression analysis, suitable for time-to-event data.
+
 •	*Survival XGBoost Cox analysis.R*
 
 Implementation of Extreme Gradient Boosting (XGBoost) adapted for Cox proportional hazards modeling, suitable for time-to-event data.
@@ -216,6 +220,18 @@ These scripts have been developed to support analyses in the following works:
 •	Muehlensiepen F, Petit P, Knitza J, Welcker M, Vuillerme N. Factors Associated With Telemedicine Use Among Patients With Rheumatic and Musculoskeletal Disease: Secondary Analysis of Data From a German Nationwide Survey. J Med Internet Res. 2023;25:e40912. doi: 10.2196/40912.
 
 •	Muehlensiepen F, Petit P, Knitza J, Welcker M, Vuillerme N. Factors associated with Telemedicine Usage among German General Practitioners and Rheumatologists: Secondary Analysis of Data from a Nationwide Survey. J Med Internet Res. 2022;24(11):e40304. doi: 10.2196/40304.
+
+•	Petit P, Berger F, Bonneterre V, Vuillerme N. Investigating Parkinson’s disease risk across farming activities using data mining and large-scale administrative health data. npj Parkinsons Dis. 2025;11:13. doi: 10.1038/s41531-024-00864-2.
+
+•	Petit P, Leroyer A, Chamot S, Fumery M, Bonneterre V. Farming activities and risk of inflammatory bowel disease: a French nationwide population-based cohort study. J Crohns Colitis. 2024;jjae050. doi: 10.1093/ecco-jcc/jjae050.
+
+•	Petit P, Chamot S, Al-Salameh A, Cancé C, Desailloud R, Bonneterre V. Farming activity and risk of treated thyroid disorders: insights from the TRACTOR project, a nationwide cohort study. Environ Res. 2024;249:118458. doi: 10.1016/j.envres.2024.118458.
+
+•	Petit P, Gondard E, Gandon G, Moreaud O, Sauvée M, Bonneterre V. Agricultural activities and risk of Alzheimer’s disease: the TRACTOR project, a nationwide retrospective cohort study. Eur J Epidemiol. 2024;39(3):271-287. doi: 10.1007/s10654-023-01079-0. 
+
+•	Petit P, Gandon G, Dubuc M, Vuillerme N, Bonneterre V. Agricultural activities and risk of treatment for depressive disorders among the entire French agricultural workforce: the TRACTOR project, a nationwide retrospective cohort study. Lancet Reg Health Eur. 2023;31:100674. doi: 10.1016/j.lanepe.2023.100674.
+
+•	Petit P, Gandon G, Chabardes S, Bonneterre V. Agricultural activities and risk of central nervous system tumors among French farm managers: results from the TRACTOR project. Int J Cancer. 2022;151(10):1737-1749. doi: 10.1002/ijc.34197.
 
 ---
 
