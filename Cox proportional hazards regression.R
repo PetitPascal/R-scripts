@@ -18,8 +18,8 @@
 #              - Interaction / effect modification test (e.g., sex)
 #              - Visualization (forest plots, KM curves, cumulative hazard/events)
 #
-# NOTE: All user-defined parameters are clearly flagged with <<USER>> comments.
-#       To adapt this script to your own data, search for <<USER>> and edit only those sections.
+# NOTE: All user-defined parameters are clearly flagged with user comments.
+#       To adapt this script to your own data, search for user and edit only those sections.
 
 # ==============================================================================
 #### Configurations ####
@@ -70,7 +70,7 @@ conflict_prefer("summarize", "dplyr")
 ## Setting the working directory
 here::here("Cox proportional hazards regression analysis")
 
-## Output folder - <<USER>> Change the output folder path if needed
+## Output folder - user Change the output folder path if needed
 output_dir<-"Results"
 if(!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 safe_path<-function(filename) file.path(output_dir, filename)
@@ -172,7 +172,7 @@ to_filename<-function(label){
 # ==============================================================================
 
 #----------------------------------------------------------------
-## <<USER>> Replace the block below with your own data import
+## user Replace the block below with your own data import
 ##          Ensure your final data frame is named `clean_data` and contains:
 ##            - time_var: the follow-up time variable (numeric)
 ##            - event_var: the event indicator (0 = censored, 1 = event)
@@ -185,12 +185,12 @@ to_filename<-function(label){
 clean_data<-as_tibble(na.omit(survival::colon) %>% filter(etype == 2) %>% select(-c(etype,study)) %>%
                       mutate(rx=case_when(rx=="Obs"~0,rx=="Lev"~1,T~2)))
 
-## Renaming outcome variables - <<USER>> Adjust variable names to match your dataset
+## Renaming outcome variables - user Adjust variable names to match your dataset
 clean_data<-clean_data %>%
             rename(Disease_status=status,
                    time_to_diagnosis=time)
 
-## Analysis setting - <<USER>> Set all key parameters here
+## Analysis setting - user Set all key parameters here
 
 # Outcome
 time_var<-"time_to_diagnosis"   # name of the time variable
@@ -543,7 +543,7 @@ if(!is.null(interaction_var) && interaction_var %in% covariates){ # if interacti
 if(length(ph_violated_vars)>1){
   
   #- - - - - - - - - - - - - - - -
-  ## Approach 1: covariate × log(time) interaction terms - <<USER>> covariate x time is also possible
+  ## Approach 1: covariate × log(time) interaction terms - user covariate x time is also possible
   
   # Building time-transformation using tt() terms for violated covariates
   tt_terms<-paste0("tt(", ph_violated_vars, ")")
@@ -584,7 +584,7 @@ if(length(ph_violated_vars)>1){
   #   A: manual time splitting at the median follow-up time (or user-defined)
   #   B: using Greg::timeSplitter (flexible interval splits)
   
-  # <<USER>> Set time split points (e.g., quartiles of follow-up)
+  # user Set time split points (e.g., quartiles of follow-up)
   time_split_points<-quantile(clean_data[[time_var]], probs = c(0.25, 0.5, 0.75))
   
   # A - Manual time splitting
@@ -622,8 +622,8 @@ if(length(ph_violated_vars)>1){
   
   # B - using Greg::timeSplitter
   if(use_time_splitter){
-    ## <<USER>> Set split_by to your time unit (e.g., 365.25 = years from days)
-    ## <<USER>> Adjust t.start and t.event to the correct column names after data re-coding if they differ from tstart / time_to_diagnosis
+    ## user Set split_by to your time unit (e.g., 365.25 = years from days)
+    ## user Adjust t.start and t.event to the correct column names after data re-coding if they differ from tstart / time_to_diagnosis
     
     # timeSplitter requires an ID variable – adding one if absent
     if(!ID_obs %in% colnames(clean_data)){
@@ -633,7 +633,7 @@ if(length(ph_violated_vars)>1){
       colnames(clean_data_ts)[which(colnames(clean_data_ts)==ID_obs)]<-"id"
     }
     
-    # Splitting time axis into intervals of equal length - <<USER>> Adjust split_by and max.follow to match your time scale
+    # Splitting time axis into intervals of equal length - user Adjust split_by and max.follow to match your time scale
     split_by<-median(clean_data_ts[[time_var]])/4  # quarterly splits
     max_follow<-max(clean_data_ts[[time_var]])
     
