@@ -81,6 +81,10 @@ multinom_fit <- nnet::multinom(outcome ~ age + sex + bmi + score + smoke,
 
 summary(multinom_fit)
 
+broom.helpers::tidy_plus_plus(multinom_fit, exponentiate = TRUE)
+# questionr::odds.ratio(multinom_fit)
+# tbl_regression(multinom_fit,exponentiate = T)
+
 #--------------------------------------------
 ## Step 5: Wald tests and p-values
 z_scores<-summary(multinom_fit)$coefficients/summary(multinom_fit)$standard.errors
@@ -103,6 +107,8 @@ rrr_df %>%
   labs(title = "Multinomial regression: Relative Risk Ratios (vs. cat1)",
        x = "RRR (log scale)", y = "Predictor", color = "Category") +
   theme_bw(base_size = 13)
+
+# ggstats::ggcoef_faceted(multinom_fit,exponentiate = TRUE)
 
 #--------------------------------------------
 ## Step 7: Model fitting
