@@ -114,6 +114,14 @@ Implements a variable selection analysis based on several approaches.
 
 Implements a comprehensive linear regression pipeline, covering various methods including simple, multiple, robust, LASSO, ridge, elastic net, and partial least squares (PLS) regression.
 
+•	*Logistic_regression.R*
+
+Implements a comprehensive logistic regression pipeline, covering various methods including simple, multiple, binary and ordinal logistic regression.
+
+•	*Count_regression.R*
+
+Implements a comprehensive regression pipeline for count or rate data, covering various methods including simple and multiple Poisson, quasi Poisson, negative binomial, zero-inflated Poisson, zero-inflated negative binomial, and rate model with offset.
+
 •	*RCS.R*
 
 Performs a Restricted Cubic Spline (RCS) analysis.
