@@ -90,9 +90,29 @@ Performs a Bayesian kernel machine regression (BKMR) analysis.
 
 Performs a Weighted Quantile Sum regression (WQS) analysis.
 
+•	*BWQS.R*
+
+Performs a Bayesian Weighted Quantile Sum regression (BWQS) analysis.
+
+•	*quantile_g_computation.R*
+
+Performs a quantile g-computation analysis.
+
+•	*DAG.R*
+
+Performs a directed acyclic graph (DAG) analysis.
+
 •	*PSM.R*
 
 Performs a propensity score matching (PSM) analysis.
+
+•	*Variable_selection.R*
+
+Implements a variable selection analysis based on several approaches.
+
+•	*Linear_regression.R*
+
+Implements a comprehensive linear regression pipeline, covering various methods including simple, multiple, robust, LASSO, ridge, elastic net, and partial least squares (PLS) regression.
 
 •	*RCS.R*
 
@@ -101,6 +121,26 @@ Performs a Restricted Cubic Spline (RCS) analysis.
 •	*RCT.R*
 
 Performs a descriptive analysis, linear mixed effect models (continuous variables), logistic mixed effect models (binary variables), and cumulative link mixed effect models (ordinal variables) for analyzing randomized controlled trial (RCT) data.
+
+*LMM.R*
+
+Performs a linear mixed-effect model, robust linear mixed-effect model, one-way mixed ANOVA, and two-way mixed ANOVA.
+
+•	*GAMM.R*
+
+Performs a generalized additive mixed model analysis.
+
+•	*multinomial_regression.R*
+
+Performs a multinomial regression analysis.
+
+•	*DLNM.R*
+
+Performs a distributed lag non-Linear model analysis.
+
+•	*Hidden_Markov_Model.R*
+
+Performs a hidden Markov model analysis.
 
 •	*Convert_semi transparent color to opaque.R*
 
@@ -225,7 +265,7 @@ These scripts have been developed to support analyses in the following works:
 
 •	Petit P, Berger F, Bonneterre V, Vuillerme N. Exploring Alzheimer's Disease Risk Factors in Farmers with Explainable Machine Learning and Administrative Health Data. Submitted.
 
-•	Petit P, Berger F, Bonneterre V, Vuillerme N. Leveraging Machine Learning with Real-World Data to Identify exposomic Risk Factors in Parkinson’s Disease among Farmers. Submitted.
+•	Petit P, Berger F, Bonneterre V, Vuillerme N. Leveraging machine learning with real-world data for hypothesis generation by identifying exposomic predictors in Parkinson’s disease among farmers. J Parkinsons Dis. 2026.  Accepted. doi : 10.1177/1877718X261453798.
 
 •	Petit P, Bonneterre V, Vuillerme N. Using Machine Learning and Nationwide Population-based Data to Unravel Predictors of Treated Depression in Farmers. Ment Illn. 2025;2025:17. doi: 10.1155/mij/5570491.
 
