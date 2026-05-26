@@ -122,7 +122,7 @@ Performs a Restricted Cubic Spline (RCS) analysis.
 
 Performs a descriptive analysis, linear mixed effect models (continuous variables), logistic mixed effect models (binary variables), and cumulative link mixed effect models (ordinal variables) for analyzing randomized controlled trial (RCT) data.
 
-*LMM.R*
+•	*LMM.R*
 
 Performs a linear mixed-effect model, robust linear mixed-effect model, one-way mixed ANOVA, and two-way mixed ANOVA.
 
