@@ -12,17 +12,13 @@ rm(list = ls())
 set.seed(123)
 
 required_pkgs <- c("MASS","dplyr","ggplot2","tidyr","caret","rms","olsrr","VarSelLCM","BeSS","glmnet","mombf")
-for (p in required_pkgs) {
-  if (!requireNamespace(p, quietly = TRUE))
-    tryCatch(install.packages(p), error=function(e)
-      message("Could not install: ", p))
-  suppressPackageStartupMessages(
-    tryCatch(library(p, character.only=TRUE),
-             error=function(e) message("Could not load: ", p))
-  )
-}
 
-# DSA is available via the partDSA package
+is_installed<-required_pkgs %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(required_pkgs[!is_installed],repos = "http://cran.us.r-project.org")
+}
+invisible(lapply(required_pkgs, library, character.only = TRUE))
+
 if (!requireNamespace("partDSA", quietly=TRUE))
   tryCatch(install.packages("partDSA"),
            error=function(e) message("partDSA not available on CRAN — skip DSA section"))
