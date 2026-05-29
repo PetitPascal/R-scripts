@@ -13,20 +13,14 @@
 ## Disabling memory torture
 gctorture(FALSE)
 
-## Installing packages if needed
+## Installing and loading packages
 pack_needed<-c("tidyverse","xgboost","reticulate","here","epimdr")
-for (i in 1:length(pack_needed)){
-  if(pack_needed[i]%in%.packages(all.available=TRUE)){
-  }else{
-    install.packages(pack_needed[i])
-  }
-}
 
-## Package loading
-library(tidyverse)
-library(xgboost)
-library(here)
-library(reticulate)
+is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(pack_needed[!is_installed])
+}
+invisible(lapply(pack_needed, library, character.only = TRUE))
 
 ## Setting the working directory
 here::here("XGBoost - multi-output")
