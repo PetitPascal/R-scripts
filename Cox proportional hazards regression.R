@@ -28,37 +28,15 @@
 ## Disabling memory torture
 gctorture(FALSE)
 
-## Installing packages if needed
+## Installing and loading packages
 pack_needed<-c("data.table","tidyverse","survival","survminer","conflicted","kdry","broom","here","ggsurvfit","ggkm",
                "gtsummary","GGally","cmprsk","tidycmprsk","car","rms","Hmisc","Greg","patchwork","ggstats")
 
-for (i in 1:length(pack_needed)){
-  if(pack_needed[i]%in%.packages(all.available=TRUE)){
-  }else{
-    install.packages(pack_needed[i])
-  }
+is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(pack_needed[!is_installed],repos = "http://cran.us.r-project.org")
 }
-
-## Loading packages
-library(survival)
-library(survminer)
-library(cmprsk)
-library(tidycmprsk)
-library(car)
-library(rms)
-library(Hmisc)
-library(Greg)
-library(data.table)
-library(tidyverse)
-library(broom)
-library(conflicted)
-library(ggsurvfit)
-library(kdry)
-library(here)
-library(ggkm)
-library(gtsummary)
-library(GGally)
-library(patchwork)
+invisible(lapply(pack_needed, library, character.only = TRUE))
 
 ## Preventing package conflicts
 conflict_prefer("select", "dplyr") 
