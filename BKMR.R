@@ -12,12 +12,14 @@
 
 required_pkgs <- c("bkmr", "fields", "openxlsx", "ggplot2", "corrplot", "MASS",
                    "dplyr", "tidyr", "scales", "gridExtra")
-for(p in required_pkgs){
-  if(!requireNamespace(p, quietly = TRUE)) install.packages(p)
-  library(p, character.only = TRUE)
-}
 
-set.seed(2025)  # reproducibility seed (change as needed)
+is_installed<-required_pkgs %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(required_pkgs[!is_installed])
+}
+invisible(lapply(required_pkgs, library, character.only = TRUE))
+
+set.seed(123)  # reproducibility seed (change as needed)
 
 ## Small helper to standardize a matrix (center & scale)
 standardize_mat <- function(m){
