@@ -11,14 +11,16 @@ rm(list = ls())
 set.seed(123)
 
 required_pkgs<-c("BWQS", "MASS", "dplyr", "ggplot2", "corrplot","tidyr", "forcats", "rstan")
-for (p in required_pkgs) {
-  if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
-  library(p, character.only = TRUE)
-}
 
 if(!("BWQS"%in%.packages(all.available=TRUE))){
   devtools::install_github("ElenaColicino/bwqs", build_vignettes = TRUE)
 }
+
+is_installed<-required_pkgs %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(required_pkgs[!is_installed])
+}
+invisible(lapply(required_pkgs, library, character.only = TRUE))
 
 #--------------------------------------------
 ## Step 2: Simulating data
