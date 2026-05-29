@@ -17,10 +17,12 @@ set.seed(123)
 
 required_pkgs <- c("MASS", "dplyr", "tidyr", "ggplot2", "broom","gtsummary", "car", "lmtest", "performance",
                    "pscl", "AER", "ggeffects", "forestmodel","ggstats", "tibble", "conflicted")
-for (p in required_pkgs) {
-  if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
-  suppressPackageStartupMessages(library(p, character.only = TRUE))
+
+is_installed<-required_pkgs %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(required_pkgs[!is_installed],repos = "http://cran.us.r-project.org")
 }
+invisible(lapply(required_pkgs, library, character.only = TRUE))
 
 # for avoiding package conflicts
 conflicted::conflict_prefer("select", "dplyr")
