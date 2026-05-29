@@ -440,6 +440,7 @@ write.table(as_tibble(brier),paste("Brier_",Sys.Date(),".csv"),sep=";",col.names
 
 shap_list <- list()
 counter <- 1
+k_folds<-5
 
 for (r in 1:n_repeats) {
   folds <- splitTools::create_folds(y = y_vec, k = k_folds, type = "stratified", seed = seed + r)
@@ -460,8 +461,7 @@ for (r in 1:n_repeats) {
       nrounds = 100,
       objective = "binary:logistic",
       eval_metric = "auc",
-      verbose = 0
-    )
+      verbose = 0 )
     
     # Computing SHAP values on validation set
     shap_values <- predict(final_model, X_te, predcontrib = TRUE)
