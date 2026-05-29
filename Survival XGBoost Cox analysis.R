@@ -4,39 +4,19 @@
 ## Disabling memory torture
 gctorture(FALSE)
 
-## Installing packages if needed
+## Installing and loading packages
 pack_needed<-c("data.table","tidyverse","mllrnrs","mlsurvlrnrs","survival","splitTools","conflicted","mlexperiments","kdry","survminer","timeROC","cluster","pec",
                "factoextra","R6","xgboost","mgcv","quantreg","parallel","here")
-for (i in 1:length(pack_needed)){
-  if(pack_needed[i]%in%.packages(all.available=TRUE)){
-  }else{
-    install.packages(pack_needed[i])
-  }
-}
 
 if(!("ggkm"%in%.packages(all.available=TRUE))){
   devtools::install_github("sachsmc/ggkm", force = TRUE)
 }
 
-## Package loading
-library(mgcv)
-library(quantreg)
-library(mllrnrs)
-library(mlsurvlrnrs)
-library(mlexperiments)
-library(tidyverse)
-library(data.table)
-library(survival)
-library(survminer)
-library(splitTools)
-library(conflicted)
-library(timeROC)
-library(cluster)
-library(factoextra)
-library(pec)
-library(xgboost)
-library(here)
-library(ggkm)
+is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(pack_needed[!is_installed],repos = "http://cran.us.r-project.org")
+}
+invisible(lapply(pack_needed, library, character.only = TRUE))
 
 ## Preventing package conflicts
 conflict_prefer("select", "dplyr") 
