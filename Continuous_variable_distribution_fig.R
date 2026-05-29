@@ -2,20 +2,14 @@
 #### Configurations  ####
 #------------------------------------------------------------------
 
-## Installing packages if needed
+## Installing and loading packages
 pack_needed<-c("tidyverse","ggridges")
 
-for (i in 1:length(pack_needed)){
-  if(pack_needed[i]%in%.packages(all.available=TRUE)){
-    #ok
-  }else{
-    install.packages(pack_needed[i],repos = "http://cran.us.r-project.org")
-  }
+is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(pack_needed[!is_installed],repos = "http://cran.us.r-project.org")
 }
-
-## Loading packages
-library(tidyverse)
-library(ggridges)
+invisible(lapply(pack_needed, library, character.only = TRUE))
 
 #------------------------------------------------------------------
 #### Creating a simulated dataset  ####
