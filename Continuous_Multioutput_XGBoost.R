@@ -18,7 +18,7 @@ pack_needed<-c("tidyverse","xgboost","reticulate","here","epimdr")
 
 is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
 if(any(is_installed == FALSE)){
-  install.packages(pack_needed[!is_installed])
+  install.packages(pack_needed[!is_installed],repos = "http://cran.us.r-project.org")
 }
 invisible(lapply(pack_needed, library, character.only = TRUE))
 
