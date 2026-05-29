@@ -4,36 +4,15 @@
 ## Disabling memory torture
 gctorture(FALSE)
 
-## Installing packages if needed
+## Installing and loading packages
 pack_needed<-c("data.table","tidyverse","tibble","broom","rstanarm","BayesFactor","bayestestR","glmnet",
                "BMA","loo","bayesboot","grid","gridExtra","conflicted","usdm","fmsb","RColorBrewer","patchwork","here")
 
-for (i in 1:length(pack_needed)){
-  if(pack_needed[i]%in%.packages(all.available=TRUE)){
-  }else{
-    install.packages(pack_needed[i])
-  }
+is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(pack_needed[!is_installed],repos = "http://cran.us.r-project.org")
 }
-
-## Package loading
-library(tidyverse)
-library(data.table)
-library(broom)
-library(rstanarm)
-library(BayesFactor)
-library(bayestestR)
-library(glmnet)
-library(BMA)
-library(loo)
-library(bayesboot)
-library(grid)
-library(gridExtra)
-library(conflicted)
-library(usdm)
-library(fmsb)
-library(RColorBrewer)
-library(patchwork)
-library(here)
+invisible(lapply(pack_needed, library, character.only = TRUE))
 
 ## Preventing package conflicts
 conflict_prefer("select", "dplyr") 
