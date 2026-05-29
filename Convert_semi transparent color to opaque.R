@@ -12,6 +12,15 @@
 #   A hex color string representing the fully opaque version.
 # ------------------------------------------------------------
 
+## Installing and loading packages
+pack_needed<-c("grDevices","scales","colorspace")
+is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(pack_needed[!is_installed],repos = "http://cran.us.r-project.org")
+}
+invisible(lapply(pack_needed, library, character.only = TRUE))
+
+## Creating the function to remove transparency
 de_alpha<-function(col) {
   
   # Converting to RGB with alpha (0–255)
@@ -26,11 +35,9 @@ de_alpha<-function(col) {
   visual_rgb <- rgb * alpha + (1 - alpha) * 255
   
   # Returning as hex color
-  grDevices::rgb(
-    red   = visual_rgb[1, ] / 255,
-    green = visual_rgb[2, ] / 255,
-    blue  = visual_rgb[3, ] / 255
-  )
+  grDevices::rgb(red=visual_rgb[1, ] / 255,
+    green=visual_rgb[2, ] / 255,
+    blue=visual_rgb[3, ] / 255)
 }
 
 # ------------------------------------------------------------
