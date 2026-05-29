@@ -18,7 +18,7 @@ if(!("BWQS"%in%.packages(all.available=TRUE))){
 
 is_installed<-required_pkgs %in% rownames(installed.packages(all.available=TRUE))
 if(any(is_installed == FALSE)){
-  install.packages(required_pkgs[!is_installed])
+  install.packages(required_pkgs[!is_installed],repos = "http://cran.us.r-project.org")
 }
 invisible(lapply(required_pkgs, library, character.only = TRUE))
 
