@@ -4,37 +4,17 @@
 ## Disabling memory torture
 gctorture(FALSE)
 
-## Installing packages if needed
+## Installing and loading packages
 pack_needed<-c("data.table","tidyverse","mllrnrs","broom","doParallel","foreach",
                "splitTools","conflicted","grid","gridExtra","RColorBrewer","mlbench",
                "mlexperiments","caret","MLmetrics","patchwork","yardstick","pROC","ordinal","performance",
                "xgboost","parallel","here","irr")
-for (i in 1:length(pack_needed)){
-  if(pack_needed[i]%in%.packages(all.available=TRUE)){
-  }else{
-    install.packages(pack_needed[i])
-  }
-}
 
-## Package loading
-library(tidyverse)
-library(data.table)
-library(broom)
-library(doParallel)
-library(foreach)
-library(pROC)
-library(grid)
-library(gridExtra)
-library(conflicted)
-library(RColorBrewer)
-library(mlexperiments)
-library(mllrnrs)
-library(mlbench)
-library(caret)
-library(MLmetrics)
-library(xgboost)
-library(patchwork)
-library(here)
+is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(pack_needed[!is_installed],repos = "http://cran.us.r-project.org")
+}
+invisible(lapply(pack_needed, library, character.only = TRUE))
 
 ## Preventing package conflicts
 conflict_prefer("select", "dplyr") 
