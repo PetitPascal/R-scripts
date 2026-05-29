@@ -18,9 +18,12 @@
 
 ## Installing packages if necessary
 required_pkgs <- c("peakRAM", "ps", "processx", "digest", "jsonlite", "httr")
-for (p in required_pkgs) {
-  if (!requireNamespace(p, quietly = TRUE)) install.packages(p, repos = "https://cloud.r-project.org")
+
+is_installed<-required_pkgs %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(required_pkgs[!is_installed])
 }
+invisible(lapply(required_pkgs, library, character.only = TRUE))
 
 ## Loading packages
 library(peakRAM)
