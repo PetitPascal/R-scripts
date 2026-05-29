@@ -5,40 +5,16 @@
 ## Disabling memory torture
 gctorture(FALSE)
 
-## Installing packages if needed
-required_packages <- c(
-  "tidyverse", "lme4", "lmerTest", "emmeans", "nlme", "mice",
+## Installing and loading packages
+required_pkgs <- c("tidyverse", "lme4", "lmerTest", "emmeans", "nlme", "mice",
   "broom.mixed", "pwr", "janitor", "gt", "gtsummary", "performance","medicaldata",
-  "ordinal", "geepack","conflicted", "patchwork","DataExplorer","fastDummies","flextable"
-)
+  "ordinal", "geepack","conflicted", "patchwork","DataExplorer","fastDummies","flextable")
 
-for (i in 1:length(required_packages)){
-  if(required_packages[i]%in%.packages(all.available=TRUE)){
-  }else{
-    install.packages(required_packages[i])
-  }
+is_installed<-required_pkgs %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(required_pkgs[!is_installed],repos = "http://cran.us.r-project.org")
 }
-
-## Loading packages
-library(tidyverse)
-library(lme4)
-library(lmerTest)
-library(emmeans)
-library(nlme)
-library(mice)
-library(broom.mixed)
-library(pwr)
-library(janitor)
-library(gt)
-library(gtsummary)
-library(performance)
-library(ordinal)
-library(geepack)
-library(conflicted)
-library(patchwork)
-library(DataExplorer)
-library(fastDummies)
-library(flextable)
+invisible(lapply(required_pkgs, library, character.only = TRUE))
 
 ## Preventing package conflicts
 conflict_prefer("select", "dplyr") 
