@@ -12,10 +12,12 @@ rm(list = ls())
 set.seed(123)
 
 required_pkgs <- c("dlnm", "splines", "MASS", "dplyr", "ggplot2","tidyr", "tseries", "lmtest", "mgcv")
-for (p in required_pkgs) {
-  if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
-  library(p, character.only = TRUE)
+
+is_installed<-required_pkgs %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(required_pkgs[!is_installed],repos = "http://cran.us.r-project.org")
 }
+invisible(lapply(required_pkgs, library, character.only = TRUE))
 
 #--------------------------------------------
 ## Step 2: Simulating daily time-series data
