@@ -8,13 +8,15 @@
 ## -------------------------
 ## Step 1 - Setup
 ## -------------------------
-required <- c("MatchIt", "cobalt", "tableone", "dplyr", "ggplot2", "gridExtra", "openxlsx")
-for (pkg in required) {
-  if (!requireNamespace(pkg, quietly = TRUE)) install.packages(pkg)
-  library(pkg, character.only = TRUE)
-}
+required_pkgs <- c("MatchIt", "cobalt", "tableone", "dplyr", "ggplot2", "gridExtra", "openxlsx")
 
-set.seed(2025)
+is_installed<-required_pkgs %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(required_pkgs[!is_installed],repos = "http://cran.us.r-project.org")
+}
+invisible(lapply(required_pkgs, library, character.only = TRUE))
+
+set.seed(123)
 
 ## -------------------------
 ## Step 2 - Using example dataset Lalonde available in MatchIt
