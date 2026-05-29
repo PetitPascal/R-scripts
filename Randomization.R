@@ -2,21 +2,14 @@
 #### Configurations  ####
 #------------------------------------------------------------------
 
-## Installing packages if needed
-pack_needed<-c("tidyverse","blockrand")
+## Installing and loading packages
+pack_needed<-c("tidyverse","blockrand","here")
 
-for (i in 1:length(pack_needed)){
-  if(pack_needed[i]%in%.packages(all.available=TRUE)){
-    #ok
-  }else{
-    install.packages(pack_needed[i],repos = "http://cran.us.r-project.org") #installation package(s) manquant(s)
-  }
+is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(pack_needed[!is_installed],repos = "http://cran.us.r-project.org")
 }
-
-
-## Loading packages
-library(tidyverse)
-library(blockrand)
+invisible(lapply(pack_needed, library, character.only = TRUE))
 
 ## Setting work directory
 here::here("Randomization scheme")
