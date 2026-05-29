@@ -11,21 +11,17 @@
 rm(list = ls())
 set.seed(123)
 
-required_pkgs <- c("MASS","dplyr","ggplot2","tidyr","caret","rms","olsrr","VarSelLCM","BeSS","glmnet","mombf")
+required_pkgs <- c("MASS","dplyr","ggplot2","tidyr","caret","rms","olsrr","VarSelLCM","BeSS","glmnet","mombf","partDSA")
+
+if(!("sparseMatrixStats"%in%.packages(all.available=TRUE))){
+  BiocManager::install("sparseMatrixStats")
+}
 
 is_installed<-required_pkgs %in% rownames(installed.packages(all.available=TRUE))
 if(any(is_installed == FALSE)){
   install.packages(required_pkgs[!is_installed],repos = "http://cran.us.r-project.org")
 }
 invisible(lapply(required_pkgs, library, character.only = TRUE))
-
-if (!requireNamespace("partDSA", quietly=TRUE))
-  tryCatch(install.packages("partDSA"),
-           error=function(e) message("partDSA not available on CRAN — skip DSA section"))
-
-if(!("sparseMatrixStats"%in%.packages(all.available=TRUE))){
-  BiocManager::install("sparseMatrixStats")
-}
 
 #--------------------------------------------
 ## Simulating data
