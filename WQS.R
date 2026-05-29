@@ -11,12 +11,14 @@
 ## -------------------------
 rm(list = ls())
 required_pkgs <- c("gWQS", "openxlsx", "MASS", "dplyr", "ggplot2", "RColorBrewer", "tidyr", "forcats")
-for (pkg in required_pkgs) {
-  if (!requireNamespace(pkg, quietly = TRUE)) install.packages(pkg, dependencies = TRUE)
-  library(pkg, character.only = TRUE)
-}
 
-set.seed(2025)   # reproducibility seed (change as needed)
+is_installed<-required_pkgs %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(required_pkgs[!is_installed],repos = "http://cran.us.r-project.org")
+}
+invisible(lapply(required_pkgs, library, character.only = TRUE))
+
+set.seed(123)   # reproducibility seed (change as needed)
 
 ## -------------------------
 ## Step 2 - Creating utility helper functions
