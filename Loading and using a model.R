@@ -11,10 +11,7 @@ loaded_model <- readRDS("example_model.rds")
 ## 2. Preparing new data for prediction
 
 # Replace this with your own new / unseen data
-new_data <- data.frame(
-  x1 = c(0.1, 0.5),
-  x2 = c(-1.2, 0.3)
-)
+new_data <- data.frame(x1 = c(0.1, 0.5), x2 = c(-1.2, 0.3))
 
 #---------------------------------------------------------
 ## 3. Making predictions 
