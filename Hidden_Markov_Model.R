@@ -11,10 +11,12 @@ rm(list = ls())
 set.seed(123)
 
 required_pkgs<-c("depmixS4", "MASS", "dplyr", "ggplot2","tidyr", "RColorBrewer", "mclust")
-for (p in required_pkgs) {
-  if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
-  library(p, character.only = TRUE)
+
+is_installed<-required_pkgs %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(required_pkgs[!is_installed],repos = "http://cran.us.r-project.org")
 }
+invisible(lapply(required_pkgs, library, character.only = TRUE))
 
 #--------------------------------------------
 ## Step 2: Simulating HMM data
