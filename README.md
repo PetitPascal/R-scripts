@@ -182,6 +182,10 @@ Assesses chemical concentration exceedance against a specified limit value and v
 
 Script for visualizing continuous variable distributions with multiple plot types.
 
+•	*Clustering.R*
+
+Clustering analysis script covering several clustering approaches (e.g., hierarchical, k-means, fuzzy, model-based, density-based, spectral), as well as graphical representation (e.g., UMAP, t-SNE), and the determination of the optimal number of clusters using several metrics (e.g., elbow, silhouette, gap statistic, NbClust).
+
 ---
 
 ***Requirements***
