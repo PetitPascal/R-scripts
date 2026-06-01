@@ -13,7 +13,7 @@
 #   - Spectral clustering
 #   - UMAP (dimensionality reduction + cluster overlay)
 #   - t-SNE (for comparison)
-#   - Cluster validation and characterisation
+#   - Cluster validation and characterization
 #   - Reusable pipeline function
 #-------------------------------------------------------------------------------
 
