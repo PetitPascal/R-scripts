@@ -80,7 +80,15 @@ Performs BMA for probabilistic model selection in logistic regression.
 
 •	*SHAP_direction.R*
 
-Function for determining feature direction based on SHAP values using Rcpp pairwise counting.
+Script to infer feature direction from SHAP values using three methods:
+
+-1) The conventional approach based on the mean SHAP sign.
+
+-2) A GAM-based approach using the derivative, with a Spearman correlation fallback.
+
+-3) A pairwise bin concordance approach.
+
+An example is provided to demonstrate how to use each method and compare their outputs.
 
 •	*BKMR.R*
 
