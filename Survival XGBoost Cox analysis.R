@@ -6,17 +6,17 @@ gctorture(FALSE)
 
 ## Installing and loading packages
 pack_needed<-c("data.table","tidyverse","mllrnrs","mlsurvlrnrs","survival","splitTools","conflicted","mlexperiments","kdry","survminer","timeROC","cluster","pec",
-               "factoextra","R6","xgboost","mgcv","quantreg","parallel","here")
+               "factoextra","R6","xgboost","mgcv","quantreg","parallel","here","scales","dplyr", "ggplot2", "tidyr", "tibble","mgcv", "gratia", "shapr","iml","devtools", "Rcpp")
 
 if(!("ggkm"%in%.packages(all.available=TRUE))){
-  devtools::install_github("sachsmc/ggkm", force = TRUE)
+  devtools::install_github("sachsmc/ggkm", force=TRUE)
 }
 
 is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
-if(any(is_installed == FALSE)){
-  install.packages(pack_needed[!is_installed],repos = "http://cran.us.r-project.org")
+if(any(is_installed==FALSE)){
+  install.packages(pack_needed[!is_installed],repos="http://cran.us.r-project.org")
 }
-invisible(lapply(pack_needed, library, character.only = TRUE))
+invisible(lapply(pack_needed, library, character.only=TRUE))
 
 ## Preventing package conflicts
 conflict_prefer("select", "dplyr") 
@@ -28,39 +28,39 @@ conflict_prefer("alpha", "scales")
 here::here("Survival XGBoost Cox analysis")
 
 ## Setting seed
-seed <- 123
+seed<-123
 
 ## Setting cores
 if (isTRUE(as.logical(Sys.getenv("_R_CHECK_LIMIT_CORES_")))) {
-  ncores <- 2L
+  ncores<-2L
 } else {
-  ncores <- ifelse(
-    test = parallel::detectCores() > 4,
-    yes = 4L,
-    no = ifelse(
-      test = parallel::detectCores() < 2L,
-      yes = 1L,
-      no = parallel::detectCores()
+  ncores<-ifelse(
+    test=parallel::detectCores() > 4,
+    yes=4L,
+    no=ifelse(
+      test=parallel::detectCores() < 2L,
+      yes=1L,
+      no=parallel::detectCores()
     )
   )
 }
 
 ## Setting mlexperiments package options
-options("mlexperiments.bayesian.max_init" = 10L)
-options("mlexperiments.optim.xgb.nrounds" = 100L)
-options("mlexperiments.optim.xgb.early_stopping_rounds" = 10L)
+options("mlexperiments.bayesian.max_init"=10L)
+options("mlexperiments.optim.xgb.nrounds"=100L)
+options("mlexperiments.optim.xgb.early_stopping_rounds"=10L)
 
 #----------------------------------------------------------------
 #### Creating functions ####
 
 ## Function for standardizing feature values into the same range
-std1 <- function(x, clip = TRUE) {
-  rng <- range(x, na.rm = TRUE)
-  if (rng[1] == rng[2]) {
+std1<-function(x, clip=TRUE) {
+  rng<-range(x, na.rm=TRUE)
+  if (rng[1]==rng[2]) {
     return(rep(0.5, length(x)))
   }
-  scaled <- (x - rng[1]) / (rng[2] - rng[1])
-  if (clip) scaled <- pmin(pmax(scaled, 0), 1)
+  scaled<-(x - rng[1]) / (rng[2] - rng[1])
+  if (clip) scaled<-pmin(pmax(scaled, 0), 1)
   return(scaled)
 }
 
@@ -90,7 +90,7 @@ test_format<-function(x){
   }else{
     
     if(x<0.05|x>=10000){
-      x<-format(signif(x,3),scientific = T)
+      x<-format(signif(x,3),scientific=T)
       
       if(nchar(x)==8&substr(x,4,4)!="e"){
         if(as.numeric(substr(x,4,4))>=5&x<0.01){
@@ -144,164 +144,244 @@ test_format<-function(x){
 }
 
 ## Normalization function
-normalize_custom <- function(x, new_min, new_max) {
-  scaled <- (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
+normalize_custom<-function(x, new_min, new_max) {
+  scaled<-(x - min(x, na.rm=TRUE)) / (max(x, na.rm=TRUE) - min(x, na.rm=TRUE))
   new_min + scaled * (new_max - new_min)
 }
 
-## Function for determining the feature direction effect (i.e.: how a feature impacts the model)
-determine_direction <- function(df, feature_col, shap_col,
-                                majority_threshold = 0.55,
-                                n_bins = 200) {
+## Function for customizing plots
+theme_Gaia<-function(){
+  theme_bw() +
+    theme(strip.text=element_text(size=12, colour="black", face="bold"),
+          strip.background=element_rect(fill="#CAE1FF",colour="black"),
+          axis.text=element_text(size=12, color="black"),
+          axis.title=element_text(size=12, face="bold", color="black"),
+          legend.text=element_text(size=12),
+          legend.title=element_text(size=12, face="bold"),
+          axis.line=element_line(color="black", linewidth=0.1))
+}
+
+#--------------------------------------------
+## Functions for determining the feature direction based on SHAP (i.e.: how a feature impacts the model)
+
+# Approach 1 - conventional (mean SHAP sign)
+
+conventional_direction<-function(df, feature_col, shap_col){
+  s<-df[[shap_col]]
+  mean_s<-mean(s, na.rm=TRUE)
+  if(abs(mean_s)< 1e-10) return("neutral")
+  ifelse(mean_s>0, "promoting", "mitigating")
+}
+
+# Approach 2 - GAM derivative (+ Spearman fallback)
+
+gam_direction<-function(df, feature_col, shap_col){
+  x<-df[[feature_col]]
+  s<-df[[shap_col]]
   
-  x <- df[[feature_col]]
-  s <- df[[shap_col]]
+  valid<-complete.cases(x, s)
+  x<-x[valid]
+  s<-s[valid]
   
-  valid <- complete.cases(x, s)
-  x <- x[valid]; s <- s[valid]
+  if (length(unique(x)) <= 1 || length(unique(s)) <= 1) return("undefined")
   
-  if (length(unique(x)) <= 1 || length(unique(s)) <= 1)
-    return("neutral")
+  # Binary or sparse
+  if (length(unique(x)) <= 2 || quantile(x, 0.75, na.rm=TRUE)==0) {
+    mean_diff<-mean(s[x > 0], na.rm=TRUE) - mean(s[x <= 0], na.rm=TRUE)
+    return(ifelse(mean_diff > 0, "promoting",
+                  ifelse(mean_diff < 0, "mitigating", "neutral")))
+  }
   
-  #---------------------------
-  # BINARY / SPARSE FEATURES
-  #---------------------------
-  if (length(unique(x)) <= 2 || quantile(x, 0.75) == 0) {
-    
-    group0 <- s[x == min(x)]
-    group1 <- s[x == max(x)]
-    
-    n0 <- length(group0); n1 <- length(group1)
-    if (n0 == 0 || n1 == 0) return("neutral")
-    
-    group0_sorted <- sort(group0)
-    
-    pos_count <- sum(findInterval(group1, group0_sorted, left.open = TRUE))
-    n_total <- as.double(n0) * as.double(n1)
-    
-    prop <- pos_count / n_total
-    if (prop >= majority_threshold) return("promoting predictor")
-    if (prop <= (1 - majority_threshold)) return("mitigating predictor")
+  # Continuous: GAM
+  tryCatch({
+    gam_m <-mgcv::gam(s ~ s(x, bs="cr", k=8), method="REML")
+    derivs<-gratia::derivatives(gam_m, term="s(x)")
+    mean_d<-mean(derivs$derivative, na.rm=TRUE)
+    if (abs(mean_d) < 1e-10) return("neutral")
+    return(ifelse(mean_d > 0, "promoting", "mitigating"))
+  }, error=function(e) {
+    rho<-suppressWarnings(cor(x, s, method="spearman"))
+    if (is.na(rho) || abs(rho) < 0.05) return("neutral")
+    return(ifelse(rho > 0, "promoting", "mitigating"))
+  })
+}
+
+# Approach 3- Pairwise bin concordance (Rcpp)
+
+# Compile C++ function
+if (!exists("bin_pairwise_counts")) {
+  Rcpp::cppFunction('
+Rcpp::List bin_pairwise_counts(NumericVector bx, NumericVector bs,
+                               NumericVector bc) {
+  int B=bx.size();
+  double pos=0.0, neg=0.0, total=0.0;
+  for (int i=0; i < B; ++i) {
+    for (int j=i+1; j < B; ++j) {
+      double ci=bc[i], cj=bc[j];
+      if (ci <= 0.0 || cj <= 0.0) continue;
+      double pairs=ci * cj;
+      if (bx[i] > bx[j]) {
+        total += pairs;
+        if (bs[i] > bs[j]) pos += pairs;
+        else if (bs[i] < bs[j]) neg += pairs;
+      } else if (bx[j] > bx[i]) {
+        total += pairs;
+        if (bs[j] > bs[i]) pos += pairs;
+        else if (bs[j] < bs[i]) neg += pairs;
+      }
+    }
+  }
+  return Rcpp::List::create(
+    Rcpp::Named("pos")  =pos,
+    Rcpp::Named("neg")  =neg,
+    Rcpp::Named("total")=total);
+}', depends="Rcpp")
+}
+
+pairwise_direction<-function(df, feature_col, shap_col,majority_threshold=0.55,n_quantile_bins=200) {
+  x<-df[[feature_col]]
+  s<-df[[shap_col]]
+  valid<-complete.cases(x, s)
+  x<-x[valid]
+  s<-s[valid]
+  
+  if(length(unique(x)) <= 1 || length(unique(s)) <= 1) return("undefined")
+  
+  # Binary / sparse
+  if(length(unique(x)) <= 2 ||
+     quantile(x, 0.75, na.rm=TRUE)==0) {
+    lv<-min(x); hv<-max(x)
+    g0<-s[x==lv]; g1<-s[x==hv]
+    if (length(g0)==0 || length(g1)==0) return("neutral")
+    g0s<-sort(g0)
+    pos<-sum(findInterval(g1, g0s, left.open=TRUE))
+    tot<-as.double(length(g0)) * as.double(length(g1))
+    pp<-pos/tot
+    if(pp >= majority_threshold) return("promoting")
+    if(pp <= 1-majority_threshold) return("mitigating")
     return("neutral")
   }
   
-  #---------------------------
-  # CONTINUOUS FEATURES
-  #---------------------------
+  # Continuous: binning
+  probs<-seq(0, 1, length.out=n_quantile_bins+1)
+  breaks<-unique(quantile(x, probs=probs, na.rm=TRUE, type=7))
+  if (length(breaks) <= 2)
+    breaks<-seq(min(x,na.rm=TRUE), max(x,na.rm=TRUE), length.out=3)
+  bins<-cut(x, breaks=breaks, include.lowest=TRUE)
   
-  bins <- cut(x, breaks = n_bins, include.lowest = TRUE)
+  bx<-as.numeric(tapply(x, bins, mean, na.rm=TRUE))
+  bs<-as.numeric(tapply(s, bins, mean, na.rm=TRUE))
+  bc<-as.numeric(tapply(s, bins, length))
+  ok<-!is.na(bx) & !is.na(bs) & !is.na(bc)
+  bx<-bx[ok]; bs<-bs[ok]; bc<-bc[ok]
   
-  bx <- tapply(x, bins, mean)
-  bs <- tapply(s, bins, mean)
-  bc <- as.numeric(tapply(s, bins, length))
+  if(length(bx) < 2) return("neutral")
   
-  keep <- !is.na(bx)
-  bx <- bx[keep]
-  bs <- bs[keep]
-  bc <- bc[keep]
+  cnts<-bin_pairwise_counts(bx, bs, bc)
+  pos_p<-as.numeric(cnts$pos)
+  neg_p<-as.numeric(cnts$neg)
+  tot_p<-as.numeric(cnts$total)
+  if(tot_p <= 0) return("neutral")
   
-  B <- length(bx)
-  if (B < 2) return("neutral")
-  
-  # Vectorized pairwise comparisons
-  bx_mat_i <- matrix(bx, B, B)
-  bx_mat_j <- t(bx_mat_i)
-  
-  bs_mat_i <- matrix(bs, B, B)
-  bs_mat_j <- t(bs_mat_i)
-  
-  # Determining which bin has higher feature value
-  higher_x <- bx_mat_i > bx_mat_j
-  
-  # Counting sample pairs
-  bc_mat_i <- matrix(as.numeric(bc), B, B)
-  bc_mat_j <- t(bc_mat_i)
-  n_pairs  <- bc_mat_i * bc_mat_j
-  
-  total_pairs <- sum(n_pairs[higher_x])
-  
-  if (total_pairs == 0) return("neutral")
-  
-  pos_pairs <- sum(n_pairs[higher_x & (bs_mat_i > bs_mat_j)])
-  neg_pairs <- sum(n_pairs[higher_x & (bs_mat_i < bs_mat_j)])
-  
-  prop_pos <- pos_pairs / total_pairs
-  prop_neg <- neg_pairs / total_pairs
-  
-  if (prop_pos >= majority_threshold) return("promoting predictor")
-  if (prop_neg >= majority_threshold) return("mitigating predictor")
+  pp<-pos_p/tot_p
+  np<-neg_p/tot_p
+  if(pp>=majority_threshold) return("promoting")
+  if(np>=majority_threshold) return("mitigating")
   return("neutral")
+}
+
+## Reusable wrapper: computing directions for all features
+compute_shap_directions<-function(data_df, feature_cols,shap_prefix="shap_",
+                                  methods=c("conventional","gam","pairwise"),
+                                  threshold=0.55,n_bins=200) {
+  
+  res<-lapply(feature_cols, function(f){
+    sc<-paste0(shap_prefix, f)
+    if(!sc %in% names(data_df)){
+      message("SHAP column not found for: ", f); return(NULL)
+    }
+    
+    row<-data.frame(feature=f,
+                    mean_shap=round(mean(data_df[[sc]], na.rm=TRUE), 5),
+                    median_shap=round(median(data_df[[sc]],na.rm=TRUE),5))
+    
+    if ("conventional" %in% methods)
+      row$conventional<-conventional_direction(data_df, f, sc)
+    if ("gam" %in% methods)
+      row$gam_deriv<-gam_direction(data_df, f, sc)
+    if ("pairwise" %in% methods)
+      row$pairwise_bins<-pairwise_direction(data_df, f, sc, majority_threshold=threshold,n_quantile_bins=n_bins)
+    row
+  })
+  
+  do.call(rbind, Filter(Negate(is.null), res))
 }
 
 #----------------------------------------------------------------
 #### Data import and preprocessing ####
 
 ## Importing the clean dataset
-clean_data<-as_tibble(na.omit(survival::colon) %>% filter(etype == 2) %>% select(-id) %>% mutate(rx=case_when(rx=="Obs"~0,rx=="Lev"~1,T~2)))
+clean_data<-as_tibble(na.omit(survival::colon) %>% filter(etype==2) %>% select(-id) %>% mutate(rx=case_when(rx=="Obs"~0,rx=="Lev"~1,T~2)))
 
 ## Renaming outcome variables
 colnames(clean_data)[which(colnames(clean_data)=="status")]<-"Disease_status"
 colnames(clean_data)[which(colnames(clean_data)=="time")]<-"time_to_diagnosis"
 
 ## Transforming the clean dataset into data.table
-dataset <- as.data.table(clean_data)
+dataset<-as.data.table(clean_data)
 
 ## Creating vectors with the independent and dependent variable names
-surv_cols <- c("Disease_status", "time_to_diagnosis")
-feature_cols <- setdiff(colnames(dataset), c(surv_cols,"ID"))
+surv_cols<-c("Disease_status", "time_to_diagnosis")
+feature_cols<-setdiff(colnames(dataset), c(surv_cols,"ID"))
 
 ## Creating split vector and data partition
-split_vector <- splitTools::multi_strata(df = dataset[, ..surv_cols], strategy = "kmeans", k = 4)
-data_split <- splitTools::partition(y = split_vector, p = c(train = 0.7, test = 0.3), type = "stratified", seed = seed)
+split_vector<-splitTools::multi_strata(df=dataset[, ..surv_cols], strategy="kmeans", k=4)
+data_split<-splitTools::partition(y=split_vector, p=c(train=0.7, test=0.3), type="stratified", seed=seed)
 
 ## Ensuring no individuals are present in both training and test datasets
 good_split<-length(intersect(data_split$train, data_split$test))==0
-print(good_split)
+good_split
 
 #- - - - - - - - - -
 ## Preparing training and test datasets
 
 ## Creating the training set
-train_x <- model.matrix(~ -1 + ., dataset[data_split$train, ..feature_cols])
-train_y <- Surv(time = dataset[data_split$train, time_to_diagnosis], event = dataset[data_split$train, Disease_status])
+train_x<-model.matrix(~ -1 + ., dataset[data_split$train, ..feature_cols])
+train_y<-Surv(time=dataset[data_split$train, time_to_diagnosis], event=dataset[data_split$train, Disease_status])
 
 ## Creating the test set
-test_x <- model.matrix(~ -1 + ., dataset[data_split$test, ..feature_cols])
-test_y <- Surv(time = dataset[data_split$test, time_to_diagnosis], event = dataset[data_split$test, Disease_status])
+test_x<-model.matrix(~ -1 + ., dataset[data_split$test, ..feature_cols])
+test_y<-Surv(time=dataset[data_split$test, time_to_diagnosis], event=dataset[data_split$test, Disease_status])
 
 ## Computing sample weights to account for imbalance data
-event_counts <- dataset[data_split$train, .N, by = Disease_status][, weight := 1 / N]
-train_data <- dataset[data_split$train]
-train_weights <- event_counts[train_data, on = "Disease_status", weight]
+event_counts<-dataset[data_split$train, .N, by=Disease_status][, weight := 1 / N]
+train_data<-dataset[data_split$train]
+train_weights<-event_counts[train_data, on="Disease_status", weight]
 
 ## Creating cross-validation (CV) folds
-split_vector_train <- splitTools::multi_strata(dataset[data_split$train, ..surv_cols], strategy = "kmeans", k = 4)
-fold_list <- splitTools::create_folds(y = split_vector_train, 
-                                      k = 5,  # 5-fold CV
-                                      type = "stratified",
-                                      seed = seq(1,5,1)*123) # different random seed for each fold
+split_vector_train<-splitTools::multi_strata(dataset[data_split$train, ..surv_cols], strategy="kmeans", k=4)
+fold_list<-splitTools::create_folds(y=split_vector_train, 
+                                      k=5,  # 5-fold CV
+                                      type="stratified",
+                                      seed=seq(1,5,1)*123) # different random seed for each fold
 
-stopifnot(length(intersect(data_split$train, data_split$test)) == 0) # Ensuring no overlap
+stopifnot(length(intersect(data_split$train, data_split$test))==0) # Ensuring no overlap
 
 #----------------------------------------------------------------
 #### Customing the survival XGBoost Cox learner with sample weights support ####
 
-LearnerSurvXgboostCoxWeighted <- R6::R6Class(
-  classname = "LearnerSurvXgboostCoxWeighted",
-  inherit = mlsurvlrnrs::LearnerSurvXgboostCox,
-  public = list(
-    sample_weight = NULL,
-    
-    set_sample_weight = function(w) {
-      self$sample_weight <- w
+LearnerSurvXgboostCoxWeighted<-R6::R6Class(classname="LearnerSurvXgboostCoxWeighted",
+  inherit=mlsurvlrnrs::LearnerSurvXgboostCox,
+  public=list(sample_weight=NULL,
+    set_sample_weight=function(w){
+      self$sample_weight<-w
     },
-    
-    train = function(x, y, ...) {
+    train=function(x, y, ...){
       
-      if (!is.null(self$sample_weight)) {
-        super$train(x = x, y = y, sample_weight = self$sample_weight, ...)
-      } else {
-        super$train(x = x, y = y, ...)
+      if(!is.null(self$sample_weight)){
+        super$train(x=x, y=y, sample_weight=self$sample_weight, ...)
+      }else{
+        super$train(x=x, y=y, ...)
       }
     }
   )
@@ -312,141 +392,130 @@ LearnerSurvXgboostCoxWeighted <- R6::R6Class(
 
 #- - - - - - - - - -
 ## Defining the learner arguments
-learner_args <- list(
-  objective = "survival:cox",
-  eval_metric = "cox-nloglik",
-  nthread = ncores
-)
+learner_args<-list(objective="survival:cox", eval_metric="cox-nloglik",  nthread=ncores)
 
 #- - - - - - - - - -
 ## Setting arguments for the predict function and performance metric
-predict_args <- NULL
-performance_metric <- c_index
-performance_metric_args <- NULL
-return_models <- T
+predict_args<-NULL
+performance_metric<-c_index
+performance_metric_args<-NULL
+return_models<-T
 
 #- - - - - - - - - -
 ## Creating a random-like grid for hyperparameter tuning (random search is not currently possible with mlexperiments::MLCrossValidation$new)
 
 # Grid search
-parameter_grid <- expand.grid(
-  learning_rate = c(0.05, 0.1),
-  max_depth = c(3, 4, 5),
-  min_child_weight = c(5, 10, 20), # to avoid overfitting because small values cause instability
-  subsample = c(0.7, 0.9, 1.0), 
-  colsample_bytree = c(0.7, 0.9, 1.0),
-  nrounds = c(50, 100, 200)
-)
+parameter_grid<-expand.grid(learning_rate=c(0.05, 0.1),
+  max_depth=c(3, 4, 5),
+  min_child_weight=c(5, 10, 20), # to avoid overfitting because small values cause instability
+  subsample=c(0.7, 0.9, 1.0), 
+  colsample_bytree=c(0.7, 0.9, 1.0),
+  nrounds=c(50, 100, 200))
 
 # Limiting grid search to a maximum of 10 rows for computational efficiency and environmental sustainability considerations
-if (nrow(parameter_grid) > 10) {
+if(nrow(parameter_grid) > 10){
   set.seed(seed)
-  parameter_grid <- kdry::mlh_subset(parameter_grid, sample(seq_len(nrow(parameter_grid)), 10))
+  parameter_grid<-kdry::mlh_subset(parameter_grid, sample(seq_len(nrow(parameter_grid)), 10))
 }
 
 #- - - - - - - - - -
 ## Hyperparameter tuning
 
 # Creating the learner and setting weights
-learner <- LearnerSurvXgboostCoxWeighted$new(metric_optimization_higher_better = FALSE)
+learner<-LearnerSurvXgboostCoxWeighted$new(metric_optimization_higher_better=FALSE)
 learner$set_sample_weight(train_weights)
 
 # Initializing hyperparameter tuning
-tuner <- mlexperiments::MLTuneParameters$new(
-  learner = learner,
-  strategy = "grid",
-  ncores = ncores,
-  seed = seed
-)
+tuner<-mlexperiments::MLTuneParameters$new(
+  learner=learner,
+  strategy="grid",
+  ncores=ncores,
+  seed=seed)
 
 # Setting tuning arguments
-tuner$parameter_grid <- parameter_grid
-tuner$learner_args <- learner_args
-tuner$split_type <- "stratified"
-tuner$split_vector <- split_vector_train
+tuner$parameter_grid<-parameter_grid
+tuner$learner_args<-learner_args
+tuner$split_type<-"stratified"
+tuner$split_vector<-split_vector_train
 tuner$learner$set_sample_weight(train_weights)
-tuner$set_data(x = train_x, y = train_y)
+tuner$set_data(x=train_x, y=train_y)
 
 # Executing tuning
-tuner_results_grid <- tuner$execute(k = 5)
+tuner_results_grid<-tuner$execute(k=5)
 
 # Identifying best tuning
-best_setting <- tuner$results$best.setting
+best_setting<-tuner$results$best.setting
 
 #- - - - - - - - - -
 ## Initializing cross validation
-validator <- mlexperiments::MLCrossValidation$new(
-  learner = learner,
-  fold_list = fold_list,
-  ncores = ncores,
-  seed = seed
-)
+validator<-mlexperiments::MLCrossValidation$new(learner=learner,
+  fold_list=fold_list,
+  ncores=ncores,
+  seed=seed)
 
 #- - - - - - - - - -
 ## Setting validator arguments
-validator$learner_args <- tuner$results$best.setting[-1]
+validator$learner_args<-tuner$results$best.setting[-1]
 validator$learner$set_sample_weight(train_weights) # taking weight into account in case of imbalance dataset
-validator$predict_args <- NULL
-validator$performance_metric <- c_index
-validator$performance_metric_args <- NULL
-validator$return_models <- T
-validator$set_data(x = train_x,y = train_y) # Setting data for validator (training set)
+validator$predict_args<-NULL
+validator$performance_metric<-c_index
+validator$performance_metric_args<-NULL
+validator$return_models<-T
+validator$set_data(x=train_x,y=train_y) # Setting data for validator (training set)
 
 #- - - - - - - - - -
 ## Executing training
-validator_results <- validator$execute()
+validator_results<-validator$execute()
 
 #- - - - - - - - - -
 ## Predicting outcome in holdout test dataset
-preds_xgboost <- mlexperiments::predictions(object = validator, newdata = test_x)
+preds_xgboost<-mlexperiments::predictions(object=validator, newdata=test_x)
 
 #- - - - - - - - - -
 ## Evaluating performance on holdout test dataset
-perf_xgboost <- mlexperiments::performance(object=validator,
-                                           prediction_results = preds_xgboost,
-                                           y_ground_truth = test_y)
+perf_xgboost<-mlexperiments::performance(object=validator,
+                                           prediction_results=preds_xgboost,
+                                           y_ground_truth=test_y)
 
 #- - - - - - - - - -
 ## Identifying the best model (highest C index)
 best_mod<-perf_xgboost %>% as_tibble() %>% filter(performance==max(performance)) %>% slice(1) %>% pull(model)
-best_model <- validator$results$fold[[best_mod]]$model
+best_model<-validator$results$fold[[best_mod]]$model
 
 #----------------------------------------------------------------
 #### Retraining final model on full training set
 
 # Extracting best hyperparameters (excluding model ID)
-best_params <- tuner$results$best.setting[-1]
+best_params<-tuner$results$best.setting[-1]
 
 # Initializing new model
-final_model <- LearnerSurvXgboostCoxWeighted$new(metric_optimization_higher_better = FALSE)
+final_model<-LearnerSurvXgboostCoxWeighted$new(metric_optimization_higher_better=FALSE)
 final_model$set_sample_weight(train_weights)
 
 # Training on full training set
-final_mod<-final_model$fit(
-  x = train_x,
-  y = train_y,
-  seed = seed,
-  ncores = ncores,
-  objective = best_params$objective,
-  eval_metric = best_params$eval_metric,
-  subsample = best_params$subsample,
-  colsample_bytree = best_params$colsample_bytree,
-  min_child_weight = best_params$min_child_weight,
-  learning_rate = best_params$learning_rate,
-  nrounds = best_params$nrounds,
-  max_depth = best_params$max_depth
-)
+final_mod<-final_model$fit(x=train_x,
+  y=train_y,
+  seed=seed,
+  ncores=ncores,
+  objective=best_params$objective,
+  eval_metric=best_params$eval_metric,
+  subsample=best_params$subsample,
+  colsample_bytree=best_params$colsample_bytree,
+  min_child_weight=best_params$min_child_weight,
+  learning_rate=best_params$learning_rate,
+  nrounds=best_params$nrounds,
+  max_depth=best_params$max_depth)
 
 # Saving the final model
-saveRDS(final_mod, file = "XGBoost_model.rds")
+saveRDS(final_mod, file="XGBoost_model.rds")
 
 # Predicting on training and test sets
-preds_train_final <- predict(final_mod, xgboost::xgb.DMatrix(data = as.matrix(train_x)))
-preds_test_final <- predict(final_mod, xgboost::xgb.DMatrix(data = as.matrix(test_x)))
+preds_train_final<-predict(final_mod, xgboost::xgb.DMatrix(data=as.matrix(train_x)))
+preds_test_final<-predict(final_mod, xgboost::xgb.DMatrix(data=as.matrix(test_x)))
 
 # Evaluating performance
-c_index_train_final <- c_index(predictions = preds_train_final, ground_truth = train_y)
-c_index_test_final  <- c_index(predictions = preds_test_final,  ground_truth = test_y)
+c_index_train_final<-c_index(predictions=preds_train_final, ground_truth=train_y)
+c_index_test_final<-c_index(predictions=preds_test_final,  ground_truth=test_y)
 
 #----------------------------------------------------------------
 #### Cox model evaluation ####
@@ -464,7 +533,7 @@ for(n_var in 1:length(var_test)){
   colnames(test_tmpo)<-"tmp"
   test_tmpo<-bind_cols(test_y,test_tmpo)
   
-  cox_model<-coxph(Surv(time, status) ~ tmp, data = test_tmpo)
+  cox_model<-coxph(Surv(time, status) ~ tmp, data=test_tmpo)
   mod_res<-broom::tidy(cox_model,exponentiate=T,conf.int=T) %>%
     mutate(term=var_test[n_var],
            direction=case_when(conf.low>1~"positive association",
@@ -485,278 +554,273 @@ for(n_var in 1:length(var_test)){
 ## Grouping individuals into groups
 
 # Creating a data frame with predictions and outcomes
-risk_df <- data.frame(risk_score = preds_xgboost[["mean"]],
-                      time = test_y[, "time"],
-                      status = test_y[, "status"])
+risk_df<-data.frame(risk_score=preds_xgboost[["mean"]],
+                      time=test_y[, "time"],
+                      status=test_y[, "status"])
 
 # Creating sex groups
-risk_df$sex <- as.factor(unlist(dataset[data_split$test, "sex"]))
+risk_df$sex<-as.factor(unlist(dataset[data_split$test, "sex"]))
 
 # Creating age groups
-risk_df$age <- dataset[data_split$test, "age"]
-risk_df$age_group <- ifelse(risk_df$age < 60, "<60", "≥60")
+risk_df$age<-dataset[data_split$test, "age"]
+risk_df$age_group<-ifelse(risk_df$age < 60, "<60", "≥60")
 
 # Combining age group and sex
-risk_df$sex_age <- interaction(risk_df$age_group, risk_df$sex, sep = "_")
-risk_df$sex_age <- as.factor(risk_df$sex_age)
+risk_df$sex_age<-interaction(risk_df$age_group, risk_df$sex, sep="_")
+risk_df$sex_age<-as.factor(risk_df$sex_age)
 
 # Creating risk tertile groups
-risk_df <- risk_df %>%
-  mutate(risk_group = ntile(risk_score, 3)) %>%
-  mutate(risk_group = factor(risk_group, labels = c("Low", "Medium", "High")))
+risk_df<-risk_df %>%
+  mutate(risk_group=ntile(risk_score, 3)) %>%
+  mutate(risk_group=factor(risk_group, labels=c("Low", "Medium", "High")))
 
 #- - - - - - - - - -
 ## Computing hazard ratios
 
 # Fiting Cox model on test data using sex
-cox_model_sex <- coxph(Surv(time, status) ~ sex, data = risk_df)
+cox_model_sex<-coxph(Surv(time, status) ~ sex, data=risk_df)
 summary(cox_model_sex)
 
 # Fiting Cox model on test data using age group
-cox_model_age <- coxph(Surv(time, status) ~ age_group, data = risk_df)
+cox_model_age<-coxph(Surv(time, status) ~ age_group, data=risk_df)
 summary(cox_model_age)
 
 # Fiting Cox model on test data using age and sex groups combined
-cox_model_sex_age <- coxph(Surv(time, status) ~ sex_age, data = risk_df)
+cox_model_sex_age<-coxph(Surv(time, status) ~ sex_age, data=risk_df)
 summary(cox_model_sex_age)
 
 # Fiting Cox model on test data using the tertile groups -> hazard ratios for medium and high risk vs. low risk group
-cox_model_tertiles <- coxph(Surv(time, status) ~ risk_group, data = risk_df)
+cox_model_tertiles<-coxph(Surv(time, status) ~ risk_group, data=risk_df)
 summary(cox_model_tertiles)
 
 #- - - - - - - - - -
 ## Kaplan-Meier plot by sex
 
 # KM curve by predicted sex
-km_sex <- survfit(Surv(time, status) ~ sex, data = risk_df)
+km_sex<-survfit(Surv(time, status) ~ sex, data=risk_df)
 
 # Plot - version 1
-survminer::ggsurvplot(
-  km_sex,
-  data = risk_df,
-  risk.table = TRUE,
-  pval = TRUE,
-  palette = c("#40B696", "#F1CB0E"),
-  legend.title = "Sex",
-  legend.labs = c("Male", "Female"),
-  xlab = "Time",
-  ylab = "Survival Probability")
+survminer::ggsurvplot(km_sex,
+  data=risk_df,
+  risk.table=TRUE,
+  pval=TRUE,
+  palette=c("#40B696", "#F1CB0E"),
+  legend.title="Sex",
+  legend.labs=c("Male", "Female"),
+  xlab="Time",
+  ylab="Survival Probability")
 
 # Plot - version 2
 
 risk_df$sex<-factor(risk_df$sex,levels=c(0,1),labels=c("Male","Female"))
 
-ggplot(risk_df, aes(time = time, status = status, fill = sex, color = sex)) + geom_km() + geom_kmband() + theme_bw()+
+ggplot(risk_df, aes(time=time, status=status, fill=sex, color=sex)) + geom_km() + geom_kmband() + theme_bw()+
   scale_x_continuous("Time (years)")+
   scale_y_continuous("Survival probability")+
-  scale_fill_manual("",values=c(Male = "#40B696", Female = "orange"))+
-  scale_color_manual("",values=c(Male = "#40B696", Female = "orange"))+
-  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
-        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
-        axis.text.y = element_text(size=16,color="black"),
-        axis.text.x = element_text(size=16,color="black"),
+  scale_fill_manual("",values=c(Male="#40B696", Female="orange"))+
+  scale_color_manual("",values=c(Male="#40B696", Female="orange"))+
+  theme(strip.text.x=element_text(size=16, colour="black", angle=0),
+        strip.background=element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y=element_text(size=16,color="black"),
+        axis.text.x=element_text(size=16,color="black"),
         axis.title=element_text(size=16,face="bold",color="black"),
-        legend.text = element_text(size = 16, face = "bold"),
-        legend.title = element_text(size = 16, face = "bold"),
+        legend.text=element_text(size=16, face="bold"),
+        legend.title=element_text(size=16, face="bold"),
         legend.position="top",
-        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+        axis.line=element_line(color="black",size=0.1, linetype="solid"))
 
 # Plot - version 3
-ggplot(risk_df, aes(time = time, status = status, fill = sex, color = sex)) + geom_km() + theme_bw()+
+ggplot(risk_df, aes(time=time, status=status, fill=sex, color=sex)) + geom_km() + theme_bw()+
   scale_x_continuous("Time (years)")+
   scale_y_continuous("Survival probability")+
-  scale_fill_manual("",values=c(Male = "#40B696", Female = "orange"))+
-  scale_color_manual("",values=c(Male = "#40B696", Female = "orange"))+
-  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
-        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
-        axis.text.y = element_text(size=16,color="black"),
-        axis.text.x = element_text(size=16,color="black"),
+  scale_fill_manual("",values=c(Male="#40B696", Female="orange"))+
+  scale_color_manual("",values=c(Male="#40B696", Female="orange"))+
+  theme(strip.text.x=element_text(size=16, colour="black", angle=0),
+        strip.background=element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y=element_text(size=16,color="black"),
+        axis.text.x=element_text(size=16,color="black"),
         axis.title=element_text(size=16,face="bold",color="black"),
-        legend.text = element_text(size = 16, face = "bold"),
-        legend.title = element_text(size = 16, face = "bold"),
+        legend.text=element_text(size=16, face="bold"),
+        legend.title=element_text(size=16, face="bold"),
         legend.position="top",
-        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+        axis.line=element_line(color="black",size=0.1, linetype="solid"))
 
 #- - - - - - - - - -
 ## Kaplan-Meier plot by age groups
 
 # KM curve by predicted age
-km_age <- survfit(Surv(time, status) ~ age_group, data = risk_df)
+km_age<-survfit(Surv(time, status) ~ age_group, data=risk_df)
 
 # Plot - version 1
-survminer::ggsurvplot(
-  km_age,
-  data = risk_df,
-  risk.table = TRUE,
-  pval = TRUE,
-  palette = c("#40B696", "#F1CB0E"),
-  legend.title = "Age Group",
-  legend.labs = c("<60", "≥60"))
+survminer::ggsurvplot(km_age,
+  data=risk_df,
+  risk.table=TRUE,
+  pval=TRUE,
+  palette=c("#40B696", "#F1CB0E"),
+  legend.title="Age Group",
+  legend.labs=c("<60", "≥60"))
 
 # Plot - version 2
-ggplot(risk_df, aes(time = time, status = status, fill = age_group, color = age_group)) + geom_km() + geom_kmband() + theme_bw()+
+ggplot(risk_df, aes(time=time, status=status, fill=age_group, color=age_group)) + geom_km() + geom_kmband() + theme_bw()+
   scale_x_continuous("Time (years)")+
   scale_y_continuous("Survival probability")+
-  scale_fill_manual("Age group",values=c('≥60' = "#40B696", '<60' = "orange"))+
-  scale_color_manual("Age group",values=c('≥60' = "#40B696", '<60' = "orange"))+
-  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
-        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
-        axis.text.y = element_text(size=16,color="black"),
-        axis.text.x = element_text(size=16,color="black"),
+  scale_fill_manual("Age group",values=c('≥60'="#40B696", '<60'="orange"))+
+  scale_color_manual("Age group",values=c('≥60'="#40B696", '<60'="orange"))+
+  theme(strip.text.x=element_text(size=16, colour="black", angle=0),
+        strip.background=element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y=element_text(size=16,color="black"),
+        axis.text.x=element_text(size=16,color="black"),
         axis.title=element_text(size=16,face="bold",color="black"),
-        legend.text = element_text(size = 16, face = "bold"),
-        legend.title = element_text(size = 16, face = "bold"),
+        legend.text=element_text(size=16, face="bold"),
+        legend.title=element_text(size=16, face="bold"),
         legend.position="bottom",
-        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))+
-  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
-        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
-        axis.text.y = element_text(size=16,color="black"),
-        axis.text.x = element_text(size=16,color="black"),
+        axis.line=element_line(color="black",size=0.1, linetype="solid"))+
+  theme(strip.text.x=element_text(size=16, colour="black", angle=0),
+        strip.background=element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y=element_text(size=16,color="black"),
+        axis.text.x=element_text(size=16,color="black"),
         axis.title=element_text(size=16,face="bold",color="black"),
-        legend.text = element_text(size = 16, face = "bold"),
-        legend.title = element_text(size = 16, face = "bold"),
+        legend.text=element_text(size=16, face="bold"),
+        legend.title=element_text(size=16, face="bold"),
         legend.position="top",
-        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+        axis.line=element_line(color="black",size=0.1, linetype="solid"))
 
 # Plot - version 3
-ggplot(risk_df, aes(time = time, status = status, fill = age_group, color = age_group)) + geom_km() + theme_bw()+
+ggplot(risk_df, aes(time=time, status=status, fill=age_group, color=age_group)) + geom_km() + theme_bw()+
   scale_x_continuous("Time (years)")+
   scale_y_continuous("Survival probability")+
-  scale_fill_manual("Age group",values=c('≥60' = "#40B696", '<60' = "orange"))+
-  scale_color_manual("Age group",values=c('≥60' = "#40B696", '<60' = "orange"))+
-  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
-        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
-        axis.text.y = element_text(size=16,color="black"),
-        axis.text.x = element_text(size=16,color="black"),
+  scale_fill_manual("Age group",values=c('≥60'="#40B696", '<60'="orange"))+
+  scale_color_manual("Age group",values=c('≥60'="#40B696", '<60'="orange"))+
+  theme(strip.text.x=element_text(size=16, colour="black", angle=0),
+        strip.background=element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y=element_text(size=16,color="black"),
+        axis.text.x=element_text(size=16,color="black"),
         axis.title=element_text(size=16,face="bold",color="black"),
-        legend.text = element_text(size = 16, face = "bold"),
-        legend.title = element_text(size = 16, face = "bold"),
+        legend.text=element_text(size=16, face="bold"),
+        legend.title=element_text(size=16, face="bold"),
         legend.position="bottom",
-        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))+
-  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
-        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
-        axis.text.y = element_text(size=16,color="black"),
-        axis.text.x = element_text(size=16,color="black"),
+        axis.line=element_line(color="black",size=0.1, linetype="solid"))+
+  theme(strip.text.x=element_text(size=16, colour="black", angle=0),
+        strip.background=element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y=element_text(size=16,color="black"),
+        axis.text.x=element_text(size=16,color="black"),
         axis.title=element_text(size=16,face="bold",color="black"),
-        legend.text = element_text(size = 16, face = "bold"),
-        legend.title = element_text(size = 16, face = "bold"),
+        legend.text=element_text(size=16, face="bold"),
+        legend.title=element_text(size=16, face="bold"),
         legend.position="top",
-        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+        axis.line=element_line(color="black",size=0.1, linetype="solid"))
 
 #- - - - - - - - - -
 ## Age and sex interaction
 
 # KM curve - fitting survival curve
-surv_fit_sex_age <- survfit(Surv(time, status) ~ sex_age, data = risk_df)
+surv_fit_sex_age<-survfit(Surv(time, status) ~ sex_age, data=risk_df)
 
 # Plot - version 1
-survminer::ggsurvplot(
-  fit = surv_fit_sex_age,
-  data = risk_df,
-  risk.table = TRUE,
-  pval = TRUE,
-  conf.int = F,
-  palette = "Set1",
-  legend.title = "Predicted Risk × Age",
-  xlab = "Time",
-  ylab = "Survival probability",
-  ggtheme = theme_minimal())
+survminer::ggsurvplot(fit=surv_fit_sex_age,
+  data=risk_df,
+  risk.table=TRUE,
+  pval=TRUE,
+  conf.int=F,
+  palette="Set1",
+  legend.title="Predicted Risk × Age",
+  xlab="Time",
+  ylab="Survival probability",
+  ggtheme=theme_minimal())
 
 # Plot - version 2
 risk_df$sex_age<-factor(risk_df$sex_age,levels=c("<60_0","≥60_0","<60_1","≥60_1"),labels=c("Male <60 yo","Male ≥60 yo","Female <60 yo","Female ≥60 yo"))
 
-ggplot(risk_df, aes(time = time, status = status, fill = sex_age, color = sex_age)) + geom_km() + geom_kmband() + theme_bw()+
+ggplot(risk_df, aes(time=time, status=status, fill=sex_age, color=sex_age)) + geom_km() + geom_kmband() + theme_bw()+
   scale_x_continuous("Time (years)")+
   scale_y_continuous("Survival probability")+
-  scale_fill_manual("",values=c('Male <60 yo' = "#40B696", 'Female <60 yo' = "#F9CBC2",'Male ≥60 yo' = "#6495ED", 'Female ≥60 yo' = "orange"))+
-  scale_color_manual("",values=c('Male <60 yo' = "#40B696", 'Female <60 yo' = "#F9CBC2",'Male ≥60 yo' = "#6495ED", 'Female ≥60 yo' = "orange"))+
-  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
-        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
-        axis.text.y = element_text(size=16,color="black"),
-        axis.text.x = element_text(size=16,color="black"),
+  scale_fill_manual("",values=c('Male <60 yo'="#40B696", 'Female <60 yo'="#F9CBC2",'Male ≥60 yo'="#6495ED", 'Female ≥60 yo'="orange"))+
+  scale_color_manual("",values=c('Male <60 yo'="#40B696", 'Female <60 yo'="#F9CBC2",'Male ≥60 yo'="#6495ED", 'Female ≥60 yo'="orange"))+
+  theme(strip.text.x=element_text(size=16, colour="black", angle=0),
+        strip.background=element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y=element_text(size=16,color="black"),
+        axis.text.x=element_text(size=16,color="black"),
         axis.title=element_text(size=16,face="bold",color="black"),
-        legend.text = element_text(size = 16, face = "bold"),
-        legend.title = element_text(size = 16, face = "bold"),
+        legend.text=element_text(size=16, face="bold"),
+        legend.title=element_text(size=16, face="bold"),
         legend.position="top",
-        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+        axis.line=element_line(color="black",size=0.1, linetype="solid"))
 
 # Plot - version 3
-ggplot(risk_df, aes(time = time, status = status, fill = sex_age, color = sex_age)) + geom_km() +theme_bw()+
+ggplot(risk_df, aes(time=time, status=status, fill=sex_age, color=sex_age)) + geom_km() +theme_bw()+
   scale_x_continuous("Time (years)")+
   scale_y_continuous("Survival probability")+
-  scale_fill_manual("",values=c('Male <60 yo' = "#40B696", 'Female <60 yo' = "#F9CBC2",'Male ≥60 yo' = "#6495ED", 'Female ≥60 yo' = "orange"))+
-  scale_color_manual("",values=c('Male <60 yo' = "#40B696", 'Female <60 yo' = "#F9CBC2",'Male ≥60 yo' = "#6495ED", 'Female ≥60 yo' = "orange"))+
-  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
-        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
-        axis.text.y = element_text(size=16,color="black"),
-        axis.text.x = element_text(size=16,color="black"),
+  scale_fill_manual("",values=c('Male <60 yo'="#40B696", 'Female <60 yo'="#F9CBC2",'Male ≥60 yo'="#6495ED", 'Female ≥60 yo'="orange"))+
+  scale_color_manual("",values=c('Male <60 yo'="#40B696", 'Female <60 yo'="#F9CBC2",'Male ≥60 yo'="#6495ED", 'Female ≥60 yo'="orange"))+
+  theme(strip.text.x=element_text(size=16, colour="black", angle=0),
+        strip.background=element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y=element_text(size=16,color="black"),
+        axis.text.x=element_text(size=16,color="black"),
         axis.title=element_text(size=16,face="bold",color="black"),
-        legend.text = element_text(size = 16, face = "bold"),
-        legend.title = element_text(size = 16, face = "bold"),
+        legend.text=element_text(size=16, face="bold"),
+        legend.title=element_text(size=16, face="bold"),
         legend.position="top",
-        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+        axis.line=element_line(color="black",size=0.1, linetype="solid"))
 
 #- - - - - - - - - -
 ## Kaplan-Meier plot by risk tertile group
 
 # KM curve by predicted risk tertile
-km_fit <- survfit(Surv(time, status) ~ risk_group, data = risk_df)
+km_fit<-survfit(Surv(time, status) ~ risk_group, data=risk_df)
 
 # Plot
-survminer::ggsurvplot(
-  km_fit,
-  data = risk_df,
-  risk.table = TRUE,
-  pval = TRUE,
-  conf.int = TRUE,
-  palette = c("#40B696", "#F1CB0E", "red"),
-  legend.title = "Predicted Risk Group",
-  legend.labs = c("Low", "Medium", "High"),
-  xlab = "Time",
-  ylab = "Survival probability")
+survminer::ggsurvplot(km_fit,
+  data=risk_df,
+  risk.table=TRUE,
+  pval=TRUE,
+  conf.int=TRUE,
+  palette=c("#40B696", "#F1CB0E", "red"),
+  legend.title="Predicted Risk Group",
+  legend.labs=c("Low", "Medium", "High"),
+  xlab="Time",
+  ylab="Survival probability")
 
 # plot - version 2
-ggplot(risk_df, aes(time = time, status = status, fill = risk_group, color = risk_group)) + geom_km() + geom_kmband() + theme_bw()+
+ggplot(risk_df, aes(time=time, status=status, fill=risk_group, color=risk_group)) + geom_km() + geom_kmband() + theme_bw()+
   scale_x_continuous("Time (years)")+
   scale_y_continuous("Survival probability")+
-  scale_fill_manual("",values=c(Low = "#40B696", Medium = "#F1CB0E", High = "red"))+
-  scale_color_manual("",values=c(Low = "#40B696", Medium = "#F1CB0E", High = "red"))+
-  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
-        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
-        axis.text.y = element_text(size=16,color="black"),
-        axis.text.x = element_text(size=16,color="black"),
+  scale_fill_manual("",values=c(Low="#40B696", Medium="#F1CB0E", High="red"))+
+  scale_color_manual("",values=c(Low="#40B696", Medium="#F1CB0E", High="red"))+
+  theme(strip.text.x=element_text(size=16, colour="black", angle=0),
+        strip.background=element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y=element_text(size=16,color="black"),
+        axis.text.x=element_text(size=16,color="black"),
         axis.title=element_text(size=16,face="bold",color="black"),
-        legend.text = element_text(size = 16, face = "bold"),
-        legend.title = element_text(size = 16, face = "bold"),
+        legend.text=element_text(size=16, face="bold"),
+        legend.title=element_text(size=16, face="bold"),
         legend.position="top",
-        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
-
+        axis.line=element_line(color="black",size=0.1, linetype="solid"))
 
 # plot - version 3
-ggplot(risk_df, aes(time = time, status = status, fill = risk_group, color = risk_group)) + geom_km() + theme_bw()+
+ggplot(risk_df, aes(time=time, status=status, fill=risk_group, color=risk_group)) + geom_km() + theme_bw()+
   scale_x_continuous("Time (years)")+
   scale_y_continuous("Survival probability")+
-  scale_fill_manual("",values=c(Low = "#40B696", Medium = "#F1CB0E", High = "red"))+
-  scale_color_manual("",values=c(Low = "#40B696", Medium = "#F1CB0E", High = "red"))+
-  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
-        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
-        axis.text.y = element_text(size=16,color="black"),
-        axis.text.x = element_text(size=16,color="black"),
+  scale_fill_manual("",values=c(Low="#40B696", Medium="#F1CB0E", High="red"))+
+  scale_color_manual("",values=c(Low="#40B696", Medium="#F1CB0E", High="red"))+
+  theme(strip.text.x=element_text(size=16, colour="black", angle=0),
+        strip.background=element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y=element_text(size=16,color="black"),
+        axis.text.x=element_text(size=16,color="black"),
         axis.title=element_text(size=16,face="bold",color="black"),
-        legend.text = element_text(size = 16, face = "bold"),
-        legend.title = element_text(size = 16, face = "bold"),
+        legend.text=element_text(size=16, face="bold"),
+        legend.title=element_text(size=16, face="bold"),
         legend.position="top",
-        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+        axis.line=element_line(color="black",size=0.1, linetype="solid"))
 
 #----------------------------------------------------------------
 #### Feature importance ####
 
 #- - - - - - - - - -
 ## Extracting features considered in the best model
-names <- final_mod$feature_names
+names<-final_mod$feature_names
 
 ## Creating the importance matrix
-importance_matrix <- xgb.importance(names, model = final_mod)
+importance_matrix<-xgb.importance(names, model=final_mod)
 importance_matrix<-as_tibble(importance_matrix)
 
 #- - - - - - - - - -
@@ -769,57 +833,58 @@ plot1<-xgb.ggplot.importance(importance_matrix2)+
   theme_bw()+
   scale_y_continuous("Importance")+
   ggtitle("")+
-  theme(strip.text = element_text(size = 16, colour = "black", angle = 0),
-        strip.background = element_rect(fill='#009E73', colour="black", size=1),
-        axis.text = element_text(size=16,color="black"),
+  theme(strip.text=element_text(size=16, colour="black", angle=0),
+        strip.background=element_rect(fill='#009E73', colour="black", size=1),
+        axis.text=element_text(size=16,color="black"),
         axis.title=element_text(size=16,face="bold",color="black"),
-        legend.text = element_text(size = 12, face = "bold"),
-        legend.title=element_text(size = 16, face = "bold"),
-        legend.position = c(.87, .8),
-        legend.background = element_rect(fill = "white", color = "black"),
-        axis.line = element_line(color = "black",size = 0.1, linetype = "solid")) 
+        legend.text=element_text(size=12, face="bold"),
+        legend.title=element_text(size=16, face="bold"),
+        legend.position=c(.87, .8),
+        legend.background=element_rect(fill="white", color="black"),
+        axis.line=element_line(color="black",size=0.1, linetype="solid")) 
 
 ## Exporting the graph
 ggsave(plot1,
        file=paste("Importance_Top 50_",
                   Sys.Date(),".pdf",sep=""),
-       dpi=600,width=40,height=30,units = "cm",limitsize=F)
+       dpi=600,width=40,height=30,units="cm",limitsize=F)
 
 #----------------------------------------------------------------
 #### SHAP analysis ####
 
 #- - - - - - - - - -
 ## Calculating SHAP values
-contr <- predict(final_mod, as.matrix(test_x[,final_mod$feature_names]), predcontrib = TRUE)
+contr<-predict(final_mod, as.matrix(test_x), predcontrib=TRUE)
 shap<-as_tibble(contr)
-shap_contrib <- as.data.table(contr)
+shap_contrib<-as.data.table(contr)
 
 #- - - - - - - - - -
 ## Removing BIAS term
-shap_contrib <- shap_contrib[, !grepl("bias", names(shap_contrib), ignore.case = TRUE), with=FALSE]
+shap_contrib<-shap_contrib[, !grepl("bias", names(shap_contrib), ignore.case=TRUE), with=FALSE]
+shap_contrib<-shap_contrib[, !grepl("(Intercept)", names(shap_contrib), ignore.case = TRUE), with=FALSE]
 
 #- - - - - - - - - -
 ## Computing mean SHAP score
-mean_shap_score <- colMeans(abs(shap_contrib))[order(colMeans(abs(shap_contrib)), decreasing = T)]
+mean_shap_score<-colMeans(abs(shap_contrib))[order(colMeans(abs(shap_contrib)), decreasing=T)]
 
 #- - - - - - - - - -
 ## Reshaping SHAP values to long format
 shap_score<-shap_contrib
-shap_score_sub <- as.data.table(shap_score)
-shap_score_sub <- shap_score_sub[, names(mean_shap_score), with = F]
-shap_score_long <- melt.data.table(shap_score_sub, measure.vars = colnames(shap_score_sub))
+shap_score_sub<-as.data.table(shap_score)
+shap_score_sub<-shap_score_sub[, names(mean_shap_score), with=F]
+shap_score_long<-melt.data.table(shap_score_sub, measure.vars=colnames(shap_score_sub))
 
 #- - - - - - - - - -
 ## Matching feature values
-fv_sub <- as.data.table(test_x)[, names(mean_shap_score), with = F]
-fv_sub_long <- melt.data.table(fv_sub, measure.vars = colnames(fv_sub))
-fv_sub_long[, stdfvalue := std1(value), by = "variable"]
-names(fv_sub_long) <- c("variable", "rfvalue", "stdfvalue")
+fv_sub<-as.data.table(test_x)[, names(mean_shap_score), with=F]
+fv_sub_long<-melt.data.table(fv_sub, measure.vars=colnames(fv_sub))
+fv_sub_long[, stdfvalue := std1(value), by="variable"]
+names(fv_sub_long)<-c("variable", "rfvalue", "stdfvalue")
 
 #- - - - - - - - - -
 ## Merging  SHAP and feature values
-shap_long2 <- cbind(shap_score_long, fv_sub_long[,c('rfvalue','stdfvalue')])
-shap_long2[, mean_value := mean(abs(value)), by = variable]
+shap_long2<-cbind(shap_score_long, fv_sub_long[,c('rfvalue','stdfvalue')])
+shap_long2[, mean_value := mean(abs(value)), by=variable]
 setkey(shap_long2, variable)
 
 #- - - - - - - - - -
@@ -846,20 +911,20 @@ Shap_val<-Shap_val %>% rowwise() %>% mutate(mean_value=test_format(mean_value),
 
 #- - - - - - - - - -
 ## Pivoting SHAP and features long format
-shap_tempo <- shap %>% 
+shap_tempo<-shap %>% 
   rowid_to_column("id") %>%
-  pivot_longer(-id, names_to = "feature", values_to = "shap_value")
+  pivot_longer(-id, names_to="feature", values_to="shap_value")
 
-tempopo <- test_x[, final_mod$feature_names] %>%
+tempopo<-test_x %>%
   as_tibble() %>%
   rowid_to_column("id") %>%
-  pivot_longer(-id, names_to = "feature", values_to = "feature_value")
+  pivot_longer(-id, names_to="feature", values_to="feature_value")
 
-tempopo <- left_join(tempopo, shap_tempo, by = c("id", "feature"))
+tempopo<-left_join(tempopo, shap_tempo, by=c("id", "feature"))
 
 #- - - - - - - - - -
 ## SHAP summary and merging labels
-test_save<-xgb.ggplot.shap.summary(as.matrix(test_x[,final_mod$feature_names]), contr, model = final_mod,top_n=50)
+test_save<-xgb.ggplot.shap.summary(as.matrix(test_x), contr, model=final_mod,top_n=50)
 test_save<-as_tibble(test_save$data)
 
 tempopo<-left_join(tempopo,Shap_val,by=base::intersect(colnames(tempopo),colnames(Shap_val)))
@@ -868,25 +933,33 @@ test3<-Shap_val %>% arrange(desc(as.numeric(mean_value)))
 
 #- - - - - - - - - -
 ## SHAP directionality summary
-direction_impact<-test_save %>% group_by(feature) %>%
-  group_map(~tibble(feature=.y$feature,
-                    direction=determine_direction(.x,"feature_value","shap_value")
-  )) %>%
-  bind_rows
 
-test<-left_join(tempopo,direction_impact,by="feature")
+shap_contrib2<-shap_contrib
+colnames(shap_contrib2)<-paste("shap",colnames(shap_contrib2),sep="_")
+full_test<-bind_cols(test_x,shap_contrib2)
+
+direction_impact<-compute_shap_directions(data_df=full_test,
+                                          feature_cols=colnames(test_x),
+                                          methods=c("conventional","gam","pairwise"),
+                                          threshold=0.55,
+                                          n_bins=200) %>% select(-c(mean_shap,median_shap))
+
+test<-left_join(tempopo,direction_impact,by="feature") %>% 
+  mutate(direction=pairwise_bins) # selecting the pairwise-based approach, adapt if needed
+
+test<-left_join(test,Shap_val,by=base::intersect(colnames(test),colnames(Shap_val)))
 
 test_tmp<-test %>% mutate(impact=direction) %>%
-  select(feature, mean_value,IC_2.5,IC_97.5,impact) %>% 
+  select(feature, mean_value,IC_2.5,IC_97.5,impact,mean_SHAP) %>% 
   distinct() %>%
   mutate(mean_value=as.numeric(mean_value),
          IC_2.5=as.numeric(IC_2.5),
          IC_97.5=as.numeric(IC_97.5)) %>%
-  mutate(mean_value=if_else(impact=="mitigating predictor",-mean_value,mean_value),
-         IC_2.5=if_else(impact=="mitigating predictor",-IC_2.5,IC_2.5),
-         IC_97.5=if_else(impact=="mitigating predictor",-IC_97.5,IC_97.5))
+  mutate(mean_value=if_else(impact=="mitigating",-mean_value,mean_value),
+         IC_2.5=if_else(impact=="mitigating",-IC_2.5,IC_2.5),
+         IC_97.5=if_else(impact=="mitigating",-IC_97.5,IC_97.5))
 
-test_tmp<-test_tmp %>% arrange(desc(mean_value)) %>% filter(mean_value!=0)
+test_tmp<-test_tmp %>% arrange(desc(mean_value)) %>% filter(mean_value!=0) %>% filter(!is.na(mean_value))
 
 #- - - - - - - - - -
 ## Plotting SHAP
@@ -897,132 +970,110 @@ ordre_def2<-test_tmp %>% filter(mean_value<0) %>% arrange(desc(IC_97.5))
 ordre_def<-bind_rows(ordre_def1,ordre_def2)
 
 test_tmp$feature<-factor(test_tmp$feature,levels=rev(unique(ordre_def$feature)))
-test_tmp$impact<-factor(test_tmp$impact,levels=c("mitigating predictor","neutral","promoting predictor"),labels=c("mitigating predictor","no impact","promoting predictor"))
+test_tmp$impact<-factor(test_tmp$impact,levels=c("mitigating","neutral","promoting"),labels=c("mitigating predictor","no impact","promoting predictor"))
 
 # Plot 1: error bar
 plot1<-ggplot(test_tmp,aes(y=feature,x=mean_value,col=impact))+
   geom_point()+
-  geom_errorbar(aes(xmin = IC_2.5, xmax = IC_97.5))+
+  geom_errorbar(aes(xmin=IC_2.5, xmax=IC_97.5))+
   scale_x_continuous("mean |SHAP value|",label=function(x) abs(x))+
-  geom_text(aes(x=IC_97.5,y=feature,label=abs(IC_97.5)),size=5,position=position_nudge(x = if_else(test_tmp$IC_97.5>=0,0.15,-0.15)))+
+  geom_text(aes(x=IC_97.5,y=feature,label=abs(IC_97.5)),size=5,position=position_nudge(x=if_else(test_tmp$IC_97.5>=0,0.15,-0.15)))+
   scale_y_discrete("")+
-  theme_bw()+
+  theme_Gaia()+
   scale_color_manual("Direction:",
                      na.value="white",
                      values=rev(c("neutral"="black","promoting predictor"="#C35C33","mitigating predictor"="#40B696")))+
-  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
-        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
-        axis.text.y = element_text(size=16,color="black"),
-        axis.text.x = element_text(size=16,color="black"),
-        axis.title=element_text(size=16,face="bold",color="black"),
-        legend.text = element_text(size = 16, face = "bold"),
-        legend.title = element_text(size = 16, face = "bold"),
-        legend.position="bottom",
-        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+  theme(legend.position="bottom")
 
 # Exporting plot 1
 ggsave(plot1,
        file=paste("SHAP_top 50_v1_",
                   Sys.Date(),".pdf",sep=""),
-       dpi=600,width=60,height=30,units = "cm",limitsize=F)
+       dpi=600,width=60,height=30,units="cm",limitsize=F)
 
 # Plot 2: barplot
 ordre_def<-test_tmp %>% arrange(desc(mean_value))
 test_tmp$feature<-factor(test_tmp$feature,levels=rev(unique(ordre_def$feature)))
 
 plot2<-ggplot(test_tmp,aes(y=feature,x=mean_value,fill=impact))+
-  geom_bar(stat = "identity",col='black')+
-  geom_text(aes(x=mean_value,y=feature,label=abs(mean_value)),size=6,position=position_nudge(x = if_else(test_tmp$mean_value>=0,0.05,-0.05)))+
+  geom_bar(stat="identity",col='black')+
+  geom_text(aes(x=mean_value,y=feature,label=abs(mean_value)),size=6,position=position_nudge(x=if_else(test_tmp$mean_value>=0,0.05,-0.05)))+
   scale_x_continuous("mean |SHAP value|",label=function(x) abs(x))+
   scale_y_discrete("")+
-  theme_bw()+
+  theme_Gaia()+
   scale_fill_manual("Direction:",
                     na.value="white",
                     values=c("mitigating predictor"="#A6DDCE","promoting predictor"="#F9CBC2","neutral"="white"))+
-  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
-        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
-        axis.text = element_text(size=16,color="black", face = "bold"),
-        axis.title=element_text(size=16,face="bold",color="black"),
-        legend.text = element_text(size = 16, face = "bold"),
-        legend.title = element_text(size = 16, face = "bold"),
-        legend.position="bottom",
-        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+  theme(legend.position="bottom")
 
 # Exporting plot 2
 ggsave(plot2,
        file=paste("SHAP_top 50_v2_",
                   Sys.Date(),".pdf",sep=""),
-       dpi=600,width=60,height=30,units = "cm",limitsize=F)
+       dpi=600,width=60,height=30,units="cm",limitsize=F)
 
 #- - - - - - - - - -
 ## Creating a dataset with both SHAP and feature values for SHAP dependence plots
 
 # Shap values
-shap_values <- shap %>%
-  mutate(id = row_number()) %>%
-  pivot_longer(cols = -c(id), names_to = "feature", values_to = "shap_value")
+shap_values<-shap %>%
+  mutate(id=row_number()) %>%
+  pivot_longer(cols=-c(id), names_to="feature", values_to="shap_value")
 
 # Feature values
-feature_values <- test_x %>%
+feature_values<-test_x %>%
   as.data.frame() %>%
-  mutate(id = row_number()) %>%
-  pivot_longer(cols = -c(id), names_to = "feature", values_to = "feature_value")
+  mutate(id=row_number()) %>%
+  pivot_longer(cols=-c(id), names_to="feature", values_to="feature_value")
 
 # Merging shap and feature values
-shap_full <- shap_long %>% left_join(feature_values, by = c("id", "feature"))
+shap_long<-shap_contrib %>% mutate(id=1:nrow(shap_contrib)) %>% pivot_longer(cols=-"id") %>% as_tibble()
+colnames(shap_long)<-c("id","feature","shap_value")
+shap_full<-shap_long %>% left_join(feature_values, by=c("id", "feature"))
 
 #- - - - - - - - - -
 ## Dependence plot - example for a continuous variable (age)
 
 # Pulling feature values and SHAP values
-feature_vals <- shap_full %>% filter(feature == "age") %>% select(feature_value) %>% pull # feature values
-shap_vals <- shap_full %>% filter(feature == "age") %>% select(shap_value) %>% pull       # shap values
+feature_vals<-shap_full %>% filter(feature=="age") %>% select(feature_value) %>% pull # feature values
+shap_vals<-shap_full %>% filter(feature=="age") %>% select(shap_value) %>% pull       # shap values
 
-gam_fit <-  mgcv::gam(shap_vals ~ s(feature_vals, bs="cs", k=10)) # GAM fitting
+gam_fit<-mgcv::gam(shap_vals ~ s(feature_vals, bs="cs", k=10)) # GAM fitting
 
 # Generating fine grid and predicting GAM curve
-pred_grid <- seq(min(feature_vals, na.rm=T), max(feature_vals, na.rm=T), length.out=1000)
-gam_pred <- predict(gam_fit, newdata=data.frame(feature_vals=pred_grid), se.fit=T)
+pred_grid<-seq(min(feature_vals, na.rm=T), max(feature_vals, na.rm=T), length.out=1000)
+gam_pred<-predict(gam_fit, newdata=data.frame(feature_vals=pred_grid), se.fit=T)
 
 # Finding all zero crossings on GAM curve
-zero_indices <- which(diff(sign(gam_pred$fit)) != 0)
-zero_feature_values <- pred_grid[zero_indices]
+zero_indices<-which(diff(sign(gam_pred$fit)) != 0)
+zero_feature_values<-pred_grid[zero_indices]
 
-breaks <- c(min(pred_grid), zero_feature_values, max(pred_grid))
-regions <- data.frame(
-  xmin = breaks[-length(breaks)],
-  xmax = breaks[-1],
-  sign = sapply(1:(length(breaks)-1), function(i) {
-    mid_pred <- mean(gam_pred$fit[pred_grid >= breaks[i] & pred_grid <= breaks[i+1]])
+breaks<-c(min(pred_grid), zero_feature_values, max(pred_grid))
+regions<-data.frame(xmin=breaks[-length(breaks)],
+  xmax=breaks[-1],
+  sign=sapply(1:(length(breaks)-1), function(i) {
+    mid_pred<-mean(gam_pred$fit[pred_grid >= breaks[i] & pred_grid <= breaks[i+1]])
     ifelse(mid_pred > 0, "positive", "negative")
   }))
 
 # Assigning colors depending on SHAP values
-regions$color <- ifelse(regions$sign == "positive", "#F9CBC24C", "#A6DDCE4C")
+regions$color<-ifelse(regions$sign=="positive", "#F9CBC24C", "#A6DDCE4C")
 
 # Plot
-ggplot(filter(shap_full, feature == "age"),
-       aes(x = feature_value, y = shap_value)) +
-  geom_point(alpha = 0.05,col="grey50") +
-  geom_smooth(method = "gam", se = FALSE,col="black",size=2,formula = y ~ s(x, bs="cs", k=10)) +
+ggplot(filter(shap_full, feature=="age"),
+       aes(x=feature_value, y=shap_value)) +
+  geom_point(alpha=0.05,col="grey50") +
+  geom_smooth(method="gam", se=FALSE,col="black",size=2,formula=y ~ s(x, bs="cs", k=10)) +
   geom_rect(data=regions, aes(xmin=xmin, xmax=xmax, ymin=-Inf, ymax=Inf, fill=color),
             alpha=0.3, inherit.aes=FALSE) +
   geom_hline(yintercept=0,linetype="dashed") +
-  geom_vline(xintercept = zero_feature_values,linetype="dashed")+
+  geom_vline(xintercept=zero_feature_values,linetype="dashed")+
   annotate(geom="point",x=zero_feature_values,y=0,col="orange",size=3)+
   annotate(geom="text",x=zero_feature_values+1,y=0.4,col="black",size=7,label=signif(zero_feature_values,3),fontface="bold")+
   scale_x_continuous("Age")+
   scale_y_continuous("SHAP value")+
   scale_fill_identity("", labels=c(negative="#A6DDCE4C", positive="#F9CBC24C"))+
-  theme_bw()+
-  theme(
-    strip.text.x = element_text(size = 16, colour = "black"),
-    strip.background = element_rect(fill = alpha('#009E73', 0.2), colour = "black", size = 1),
-    axis.text = element_text(size = 16, colour = "black"),
-    axis.title = element_text(size = 16, face = "bold", colour = "black"),
-    legend.text = element_text(size = 16, face = "bold"),
-    legend.title = element_blank(),
-    axis.line = element_line(colour = "black", size = 0.1, linetype = "solid"))
+  theme_Gaia()
 
 #- - - - - - - - - -
 ## Dependence plot - example for an ordinal variable (differ)
@@ -1032,8 +1083,8 @@ shap_full$col_point<-factor(shap_full$col_point,levels=c("positive","negative"))
 
 # Plot
 set.seed(123)
-ggplot(filter(shap_full, feature == "differ") %>% mutate(feature_value=as.factor(feature_value)),
-       aes(x = feature_value, y = shap_value)) +
+ggplot(filter(shap_full, feature=="differ") %>% mutate(feature_value=as.factor(feature_value)),
+       aes(x=feature_value, y=shap_value)) +
   # geom_violin(alpha=0.1)+ 
   # geom_boxplot(width=0.1,alpha=0.4)+
   geom_boxplot()+
@@ -1043,36 +1094,52 @@ ggplot(filter(shap_full, feature == "differ") %>% mutate(feature_value=as.factor
   stat_summary(fun=median, geom="line", aes(group=1), linetype=1)+
   scale_x_discrete("Differentiation of tumour")+
   scale_y_continuous("SHAP value")+
-  theme_bw()+
-  theme(
-    strip.text.x = element_text(size = 16, colour = "black"),
-    strip.background = element_rect(fill = alpha('#009E73', 0.2), colour = "black", size = 1),
-    axis.text = element_text(size = 16, colour = "black"),
-    axis.title = element_text(size = 16, face = "bold", colour = "black"),
-    legend.position = "none",
-    axis.line = element_line(colour = "black", size = 0.1, linetype = "solid"))
+  theme_Gaia()
 
 #- - - - - - - - - -
 ## Dependence plot - example for a binary variable (sex)
 
 # Plot
 set.seed(123)
-ggplot(filter(shap_full, feature == "sex") %>% mutate(feature_value=as.factor(feature_value)),
-       aes(x = feature_value, y = shap_value)) +
+ggplot(filter(shap_full, feature=="sex") %>% mutate(feature_value=as.factor(feature_value)),
+       aes(x=feature_value, y=shap_value)) +
   geom_boxplot()+
   geom_jitter(aes(color=col_point)) +
   scale_color_manual("",values=c(negative="#40B696", positive="red"))+
   geom_hline(yintercept=0,linetype="dashed") +
   scale_x_discrete("Sex")+
   scale_y_continuous("SHAP value")+
-  theme_bw()+
-  theme(
-    strip.text.x = element_text(size = 16, colour = "black"),
-    strip.background = element_rect(fill = alpha('#009E73', 0.2), colour = "black", size = 1),
-    axis.text = element_text(size = 16, colour = "black"),
-    axis.title = element_text(size = 16, face = "bold", colour = "black"),
-    legend.position = "none",
-    axis.line = element_line(colour = "black", size = 0.1, linetype = "solid"))
+  theme_Gaia()
+
+#- - - - - - - - - -
+## SHAP direction comparison
+
+dir_long<-direction_impact %>%
+  dplyr::select(feature, conventional, gam_deriv, pairwise_bins) %>%
+  tidyr::pivot_longer(-feature, names_to="method", values_to="direction") %>%
+  mutate(direction=factor(direction,levels = c("promoting","neutral","mitigating","undefined")),
+         method=factor(method,
+                       levels = c("conventional","gam_deriv","pairwise_bins"),
+                       labels = c("Conventional\n(mean sign)",
+                                  "Approach 1\n(GAM derivative)",
+                                  "Approach 2\n(Pairwise bins)")))
+
+plot4<-ggplot(dir_long, aes(x=method, y=feature, fill=direction)) +
+  geom_tile(color="white", linewidth=0.8) +
+  scale_fill_manual(values = c("promoting"="#A6DDCE",
+                               "neutral"="#f7f7f7",
+                               "mitigating"="#F9CBC2",
+                               "undefined"="grey80"),
+                    na.value="grey80") +
+  labs(title="", x = "", y = "Feature", fill = "Direction") +
+  theme_Gaia()+
+  theme(legend.position="top")
+
+# Exporting plot
+ggsave(plot4,
+       file=paste("SHAP direction comparison_",
+                  Sys.Date(),".pdf",sep=""),
+       dpi=600,width=60,height=30,units = "cm",limitsize=F)
 
 #- - - - - - - - - -
 ## SHAP and Cox comparison
@@ -1080,10 +1147,11 @@ ggplot(filter(shap_full, feature == "sex") %>% mutate(feature_value=as.factor(fe
 tmp_Cox<-Cox_tab_res %>% select(term,HR,direction,concordance,p.value.log)
 colnames(tmp_Cox)<-c("feature","HR [95% CI]","Cox - association direction","Cox - C-index","Cox - LR p-value")
 
-tmp_SHAP<-test %>% select(feature,mean_SHAP,direction,mean_value) %>% distinct %>% 
+tmp_SHAP<-test %>% select(feature,mean_SHAP,direction,conventional,gam_deriv,pairwise_bins,mean_value) %>% distinct %>% 
   arrange(desc(abs(as.numeric(mean_value)))) %>% select(-mean_value)
 
-colnames(tmp_SHAP)<-c("feature","mean |SHAP| value [95% CI]","SHAP direction")
+colnames(tmp_SHAP)<-c("feature","mean |SHAP| value [95% CI]","SHAP direction",
+                      "conventional SHAP direction","GAM-based SHAP direction","Pairwise-based SHAP direction")
 
 Compa_Cox_SHAP<-left_join(tmp_SHAP,tmp_Cox,by="feature")
 
@@ -1092,27 +1160,27 @@ Compa_Cox_SHAP<-left_join(tmp_SHAP,tmp_Cox,by="feature")
 
 # Best hyperparameters
 fwrite(as_tibble(data.frame(Parameters=names(unlist(best_params)),Values=unlist(best_params))),
-       paste("best_parameters_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+       paste("best_parameters_",Sys.Date(),".csv",sep=""), sep=";", row.names=FALSE)
 
 # CV performance
-fwrite(perf_xgboost,paste("perf_xgboost_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+fwrite(perf_xgboost,paste("perf_xgboost_",Sys.Date(),".csv",sep=""), sep=";", row.names=FALSE)
 
 # C index from final model
-fwrite(as_tibble(c_index_train_final),paste("c_index_train_final_mod_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE) # c index final model on training set
-fwrite(as_tibble(c_index_test_final),paste("c_index_test_final_mod_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE) # c index final model on test set
+fwrite(as_tibble(c_index_train_final),paste("c_index_train_final_mod_",Sys.Date(),".csv",sep=""), sep=";", row.names=FALSE) # c index final model on training set
+fwrite(as_tibble(c_index_test_final),paste("c_index_test_final_mod_",Sys.Date(),".csv",sep=""), sep=";", row.names=FALSE) # c index final model on test set
 
 # Univariate Cox regression
-fwrite(Cox_tab_res,paste("Univariate Cox regression_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+fwrite(Cox_tab_res,paste("Univariate Cox regression_",Sys.Date(),".csv",sep=""), sep=";", row.names=FALSE)
 
 # Feature importance
-fwrite(importance_matrix,paste("importance_matrix_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+fwrite(importance_matrix,paste("importance_matrix_",Sys.Date(),".csv",sep=""), sep=";", row.names=FALSE)
 
 # SHAP values
-fwrite(Shap_val,paste("Shap_val_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
-fwrite(test_tmp,paste("test_tmp_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
-fwrite(test,paste("test_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
-fwrite(shap,paste("shap_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
-fwrite(shap_score_sub,paste("shap_score_sub_",Sys.Date(),".txt",sep=""), sep = ";", row.names=FALSE)
+fwrite(Shap_val,paste("Shap_val_",Sys.Date(),".csv",sep=""), sep=";", row.names=FALSE)
+fwrite(test_tmp,paste("test_tmp_",Sys.Date(),".csv",sep=""), sep=";", row.names=FALSE)
+fwrite(test,paste("test_",Sys.Date(),".txt",sep=""), sep=";", row.names=FALSE)
+fwrite(shap,paste("shap_",Sys.Date(),".txt",sep=""), sep=";", row.names=FALSE)
+fwrite(shap_score_sub,paste("shap_score_sub_",Sys.Date(),".txt",sep=""), sep=";", row.names=FALSE)
 
 # SHAP and Cox comparison
-fwrite(Compa_Cox_SHAP,paste("Compa_Cox_SHAP_",Sys.Date(),".csv",sep=""), sep = ";", row.names=FALSE)
+fwrite(Compa_Cox_SHAP,paste("Compa_Cox_SHAP_",Sys.Date(),".csv",sep=""), sep=";", row.names=FALSE)
