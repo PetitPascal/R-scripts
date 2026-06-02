@@ -8,7 +8,7 @@ gctorture(FALSE)
 pack_needed<-c("data.table","tidyverse","mllrnrs","broom","doParallel","foreach",
                "splitTools","conflicted","grid","gridExtra","RColorBrewer","mlbench",
                "mlexperiments","caret","MLmetrics","patchwork",
-               "xgboost","parallel","here","pROC")
+               "xgboost","parallel","here","pROC","dplyr", "ggplot2", "tidyr", "tibble","mgcv", "gratia", "shapr","iml", "Rcpp")
 
 is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
 if(any(is_installed == FALSE)){
