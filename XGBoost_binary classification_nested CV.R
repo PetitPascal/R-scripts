@@ -8,7 +8,7 @@ gctorture(FALSE)
 pack_needed<-c("data.table","tidyverse","mllrnrs","broom","doParallel","foreach",
                "splitTools","conflicted","grid","gridExtra","RColorBrewer","mlbench",
                "mlexperiments","caret","MLmetrics","patchwork",
-               "xgboost","parallel","here")
+               "xgboost","parallel","here","pROC")
 
 is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
 if(any(is_installed == FALSE)){
@@ -162,88 +162,172 @@ test_format<-function(x){
   return(x)
 }
 
-# Function for determining the direction (i.e.: how a feature impacts the model)
-determine_direction <- function(df, feature_col, shap_col,
-                                majority_threshold = 0.55,
-                                n_bins = 200) {
+## Function for customizing plots
+theme_Gaia<-function(){
+  theme_bw() +
+    theme(strip.text=element_text(size=12, colour="black", face="bold"),
+          strip.background=element_rect(fill="#CAE1FF",colour="black"),
+          axis.text=element_text(size=12, color="black"),
+          axis.title=element_text(size=12, face="bold", color="black"),
+          legend.text=element_text(size=12),
+          legend.title=element_text(size=12, face="bold"),
+          axis.line=element_line(color="black", linewidth=0.1))
+}
+
+#--------------------------------------------
+## Functions for determining the feature direction based on SHAP (i.e.: how a feature impacts the model)
+
+# Approach 1 - conventional (mean SHAP sign)
+
+conventional_direction<-function(df, feature_col, shap_col){
+  s<-df[[shap_col]]
+  mean_s<-mean(s, na.rm = TRUE)
+  if(abs(mean_s)< 1e-10) return("neutral")
+  ifelse(mean_s>0, "promoting", "mitigating")
+}
+
+# Approach 2 - GAM derivative (+ Spearman fallback)
+
+gam_direction<-function(df, feature_col, shap_col){
+  x<-df[[feature_col]]
+  s<-df[[shap_col]]
   
-  x <- df[[feature_col]]
-  s <- df[[shap_col]]
+  valid<-complete.cases(x, s)
+  x<-x[valid]
+  s<-s[valid]
   
-  valid <- complete.cases(x, s)
-  x <- x[valid]; s <- s[valid]
+  if (length(unique(x)) <= 1 || length(unique(s)) <= 1) return("undefined")
   
-  if (length(unique(x)) <= 1 || length(unique(s)) <= 1)
-    return("neutral")
+  # Binary or sparse
+  if (length(unique(x)) <= 2 || quantile(x, 0.75, na.rm=TRUE) == 0) {
+    mean_diff <- mean(s[x > 0], na.rm=TRUE) - mean(s[x <= 0], na.rm=TRUE)
+    return(ifelse(mean_diff > 0, "promoting",
+                  ifelse(mean_diff < 0, "mitigating", "neutral")))
+  }
   
-  #---------------------------
-  # BINARY / SPARSE FEATURES
-  #---------------------------
-  if (length(unique(x)) <= 2 || quantile(x, 0.75) == 0) {
-    
-    group0 <- s[x == min(x)]
-    group1 <- s[x == max(x)]
-    
-    n0 <- length(group0); n1 <- length(group1)
-    if (n0 == 0 || n1 == 0) return("neutral")
-    
-    group0_sorted <- sort(group0)
-    
-    pos_count <- sum(findInterval(group1, group0_sorted, left.open = TRUE))
-    n_total <- as.double(n0) * as.double(n1)
-    
-    prop <- pos_count / n_total
-    if (prop >= majority_threshold) return("promoting predictor")
-    if (prop <= (1 - majority_threshold)) return("mitigating predictor")
+  # Continuous: GAM
+  tryCatch({
+    gam_m  <- mgcv::gam(s ~ s(x, bs="cr", k=8), method="REML")
+    derivs <- gratia::derivatives(gam_m, term="s(x)")
+    mean_d <- mean(derivs$derivative, na.rm=TRUE)
+    if (abs(mean_d) < 1e-10) return("neutral")
+    return(ifelse(mean_d > 0, "promoting", "mitigating"))
+  }, error = function(e) {
+    rho <- suppressWarnings(cor(x, s, method="spearman"))
+    if (is.na(rho) || abs(rho) < 0.05) return("neutral")
+    return(ifelse(rho > 0, "promoting", "mitigating"))
+  })
+}
+
+# Approach 3- Pairwise bin concordance (Rcpp)
+
+# Compile C++ function
+if (!exists("bin_pairwise_counts")) {
+  Rcpp::cppFunction('
+Rcpp::List bin_pairwise_counts(NumericVector bx, NumericVector bs,
+                               NumericVector bc) {
+  int B = bx.size();
+  double pos = 0.0, neg = 0.0, total = 0.0;
+  for (int i = 0; i < B; ++i) {
+    for (int j = i+1; j < B; ++j) {
+      double ci = bc[i], cj = bc[j];
+      if (ci <= 0.0 || cj <= 0.0) continue;
+      double pairs = ci * cj;
+      if (bx[i] > bx[j]) {
+        total += pairs;
+        if (bs[i] > bs[j]) pos += pairs;
+        else if (bs[i] < bs[j]) neg += pairs;
+      } else if (bx[j] > bx[i]) {
+        total += pairs;
+        if (bs[j] > bs[i]) pos += pairs;
+        else if (bs[j] < bs[i]) neg += pairs;
+      }
+    }
+  }
+  return Rcpp::List::create(
+    Rcpp::Named("pos")   = pos,
+    Rcpp::Named("neg")   = neg,
+    Rcpp::Named("total") = total);
+}', depends = "Rcpp")
+}
+
+pairwise_direction<-function(df, feature_col, shap_col,majority_threshold = 0.55,n_quantile_bins=200) {
+  x<-df[[feature_col]]
+  s<-df[[shap_col]]
+  valid<-complete.cases(x, s)
+  x<-x[valid]
+  s<-s[valid]
+  
+  if(length(unique(x)) <= 1 || length(unique(s)) <= 1) return("undefined")
+  
+  # Binary / sparse
+  if(length(unique(x)) <= 2 ||
+     quantile(x, 0.75, na.rm=TRUE) == 0) {
+    lv <- min(x); hv <- max(x)
+    g0 <- s[x == lv]; g1 <- s[x == hv]
+    if (length(g0)==0 || length(g1)==0) return("neutral")
+    g0s<-sort(g0)
+    pos<-sum(findInterval(g1, g0s, left.open=TRUE))
+    tot<-as.double(length(g0)) * as.double(length(g1))
+    pp<-pos/tot
+    if(pp >= majority_threshold) return("promoting")
+    if(pp <= 1-majority_threshold) return("mitigating")
     return("neutral")
   }
   
-  #---------------------------
-  # CONTINUOUS FEATURES
-  #---------------------------
+  # Continuous: binning
+  probs<-seq(0, 1, length.out = n_quantile_bins+1)
+  breaks<-unique(quantile(x, probs=probs, na.rm=TRUE, type=7))
+  if (length(breaks) <= 2)
+    breaks<-seq(min(x,na.rm=TRUE), max(x,na.rm=TRUE), length.out=3)
+  bins<-cut(x, breaks=breaks, include.lowest=TRUE)
   
-  bins <- cut(x, breaks = n_bins, include.lowest = TRUE)
+  bx<-as.numeric(tapply(x, bins, mean, na.rm=TRUE))
+  bs<-as.numeric(tapply(s, bins, mean, na.rm=TRUE))
+  bc<-as.numeric(tapply(s, bins, length))
+  ok<-!is.na(bx) & !is.na(bs) & !is.na(bc)
+  bx<-bx[ok]; bs <- bs[ok]; bc <- bc[ok]
   
-  bx <- tapply(x, bins, mean)
-  bs <- tapply(s, bins, mean)
-  bc <- as.numeric(tapply(s, bins, length))
+  if(length(bx) < 2) return("neutral")
   
-  keep <- !is.na(bx)
-  bx <- bx[keep]
-  bs <- bs[keep]
-  bc <- bc[keep]
+  cnts<-bin_pairwise_counts(bx, bs, bc)
+  pos_p<-as.numeric(cnts$pos)
+  neg_p<-as.numeric(cnts$neg)
+  tot_p<-as.numeric(cnts$total)
+  if(tot_p <= 0) return("neutral")
   
-  B <- length(bx)
-  if (B < 2) return("neutral")
-  
-  # Vectorized pairwise comparisons
-  bx_mat_i <- matrix(bx, B, B)
-  bx_mat_j <- t(bx_mat_i)
-  
-  bs_mat_i <- matrix(bs, B, B)
-  bs_mat_j <- t(bs_mat_i)
-  
-  # Determining which bin has higher feature value
-  higher_x <- bx_mat_i > bx_mat_j
-  
-  # Counting sample pairs
-  bc_mat_i <- matrix(as.numeric(bc), B, B)
-  bc_mat_j <- t(bc_mat_i)
-  n_pairs  <- bc_mat_i * bc_mat_j
-  
-  total_pairs <- sum(n_pairs[higher_x])
-  
-  if (total_pairs == 0) return("neutral")
-  
-  pos_pairs <- sum(n_pairs[higher_x & (bs_mat_i > bs_mat_j)])
-  neg_pairs <- sum(n_pairs[higher_x & (bs_mat_i < bs_mat_j)])
-  
-  prop_pos <- pos_pairs / total_pairs
-  prop_neg <- neg_pairs / total_pairs
-  
-  if (prop_pos >= majority_threshold) return("promoting predictor")
-  if (prop_neg >= majority_threshold) return("mitigating predictor")
+  pp<-pos_p/tot_p
+  np<-neg_p/tot_p
+  if(pp>=majority_threshold) return("promoting")
+  if(np>=majority_threshold) return("mitigating")
   return("neutral")
+}
+
+## Reusable wrapper: computing directions for all features
+compute_shap_directions<-function(data_df, feature_cols,shap_prefix="shap_",
+                                  methods=c("conventional","gam","pairwise"),
+                                  threshold=0.55,n_bins=200) {
+  
+  res<-lapply(feature_cols, function(f){
+    sc<-paste0(shap_prefix, f)
+    if(!sc %in% names(data_df)){
+      message("SHAP column not found for: ", f); return(NULL)
+    }
+    
+    row<-data.frame(feature=f,
+                    mean_shap=round(mean(data_df[[sc]], na.rm=TRUE), 5),
+                    median_shap=round(median(data_df[[sc]],na.rm=TRUE),5))
+    
+    if ("conventional" %in% methods)
+      row$conventional<-conventional_direction(data_df, f, sc)
+    if ("gam" %in% methods)
+      row$gam_deriv<-gam_direction(data_df, f, sc)
+    if ("pairwise" %in% methods)
+      row$pairwise_bins<-pairwise_direction(data_df, f, sc, majority_threshold=threshold,n_quantile_bins=n_bins)
+    row
+  })
+  
+  do.call(rbind, Filter(Negate(is.null), res))
 }
 
 ## not including function (opposite function of %in%)
@@ -269,43 +353,42 @@ clean_data<-clean_data %>% select(outcome,colnames(clean_data)[which(colnames(cl
 
 #--------------------------
 ## Transforming the clean dataset into data.table
-dataset <- clean_data |> data.table::as.data.table()
+dataset<-clean_data |> data.table::as.data.table()
 
 ## Creating vectors with the independent and dependent variable names
-feature_cols <- colnames(dataset)[2:ncol(dataset)]
-target_col <- "outcome"
+feature_cols<-colnames(dataset)[2:ncol(dataset)]
+target_col<-"outcome"
 
 ## Identifying unordered factors
 categorical_var<-var_type_tab %>% filter(feature %in% colnames(clean_data)) %>% 
   filter(Var_type %in% c("categorical")) %>% select(feature) %>% pull
 
 ## One-hot encoding of unordered factors
-if (length(categorical_var) > 0) {
-  for (col in categorical_var) {
-    dataset[[col]] <- addNA(dataset[[col]])
+if(length(categorical_var) > 0){
+  for(col in categorical_var){
+    dataset[[col]]<-addNA(dataset[[col]])
   }
-  dummies <- model.matrix(~ -1 + ., data = dataset[, ..categorical_var])
-  dataset <- cbind(dataset[, !..categorical_var], dummies)
+  dummies<-model.matrix(~ -1 + ., data = dataset[, ..categorical_var])
+  dataset<-cbind(dataset[, !..categorical_var], dummies)
 }
 
-## Creating the stratified 70/30 train-test split
+## Creating a stratified 70/30 train-test split
 set.seed(seed)
 data_split <- splitTools::partition(
   y = dataset[[target_col]],
   p = c(train = 0.7, test = 0.3),
   type = "stratified",
-  seed = seed
-)
+  seed = seed)
 
 ## Preparing training and test datasets
 
 # train dataset
-X_train <- as.matrix(dataset[data_split$train, setdiff(colnames(dataset), target_col), with = FALSE])
-y_train <- as.integer(dataset[data_split$train, get(target_col)])
+X_train<-as.matrix(dataset[data_split$train, setdiff(colnames(dataset), target_col), with = FALSE])
+y_train<-as.integer(dataset[data_split$train, get(target_col)])
 
 # test dataset
-X_test  <- as.matrix(dataset[data_split$test, setdiff(colnames(dataset), target_col), with = FALSE])
-y_test  <- as.integer(dataset[data_split$test, get(target_col)])
+X_test<-as.matrix(dataset[data_split$test, setdiff(colnames(dataset), target_col), with = FALSE])
+y_test<-as.integer(dataset[data_split$test, get(target_col)])
 
 #----------------------------------------------------------------
 #### 10-fold nested cross-validation (CV) ####
@@ -314,138 +397,122 @@ y_test  <- as.integer(dataset[data_split$test, get(target_col)])
 ## Performing the outer CV on training set
 
 # Creating the outer folds
-outer_folds <- splitTools::create_folds(y_train, k = 10, type = "stratified", seed = seed)
+outer_folds<-splitTools::create_folds(y_train, k = 10, type = "stratified", seed = seed)
 
 # Creating empty lists to store results
-outer_results <- list()
-best_params_all <- list()
+outer_results<-list()
+best_params_all<-list()
 
-for (outer_idx in seq_along(outer_folds)) { # for each outer fold
+for(outer_idx in seq_along(outer_folds)){ # for each outer fold
   
   # selecting an outer fold
-  val_idx <- outer_folds[[outer_idx]]
-  train_idx_cv <- setdiff(seq_len(nrow(X_train)), val_idx)
+  val_idx<-outer_folds[[outer_idx]]
+  train_idx_cv<-setdiff(seq_len(nrow(X_train)), val_idx)
   
   # creating training and test data sets for a given outer fold
-  X_tr <- X_train[train_idx_cv, , drop = FALSE]
-  y_tr <- y_train[train_idx_cv]
-  X_val <- X_train[val_idx, , drop = FALSE]
-  y_val <- y_train[val_idx]
+  X_tr<-X_train[train_idx_cv, , drop = FALSE]
+  y_tr<-y_train[train_idx_cv]
+  X_val<-X_train[val_idx, , drop = FALSE]
+  y_val<-y_train[val_idx]
   
   # Handling imbalance data
-  Weight <- max(table(y_tr)) / min(table(y_tr))
+  Weight<-max(table(y_tr))/min(table(y_tr))
   
   #--------------------------
   ## Performing the inner CV for tuning
   
   # Creating the inner folds
-  inner_folds <- splitTools::create_folds(y_tr, k = 10, type = "stratified", seed = seed)
+  inner_folds<-splitTools::create_folds(y_tr, k = 10, type = "stratified", seed = seed)
   
   # Creating random parameter space for hyperparameter tuning
-  param_list <- expand.grid(
-    subsample = seq(0.5, 1, 0.25),
+  param_list<-expand.grid(subsample = seq(0.5, 1, 0.25),
     colsample_bytree = seq(0.5, 1, 0.25),
     min_child_weight = c(1, 5, 10),
     learning_rate = c(0.05, 0.1, 0.3),
     max_depth = c(3, 5, 7),
-    scale_pos_weight = Weight
-  ) %>% dplyr::slice_sample(n = 30, replace = TRUE) # Limiting space to 30 combinations for computational efficiency and environmental sustainability considerations
+    scale_pos_weight = Weight) %>% 
+    dplyr::slice_sample(n = 30, replace = TRUE) # Limiting space to 30 combinations for computational efficiency and environmental sustainability considerations
   
   # Initializing best parameters
-  best_auc <- -Inf
-  best_params <- NULL
+  best_auc<- -Inf
+  best_params<-NULL
   
-  for (i in 1:nrow(param_list)) {
+  for(i in 1:nrow(param_list)){
     
     # Initializing cross validation
-    xgb_cv <- mlexperiments::MLCrossValidation$new(
-      learner = mllrnrs::LearnerXgboost$new(metric_optimization_higher_better = TRUE),
+    xgb_cv <- mlexperiments::MLCrossValidation$new(learner = mllrnrs::LearnerXgboost$new(metric_optimization_higher_better = TRUE),
       fold_list = inner_folds,
       ncores = 2,
-      seed = 0
-    )
+      seed = 0)
     
     # Defining the learner arguments
-    xgb_cv$learner_args <- c(
-      as.list(param_list[i, ]),
-      list(objective = "binary:logistic", eval_metric = "logloss", nrounds = 100L)
-    )
-    xgb_cv$performance_metric_args <- list(positive = "1")
-    xgb_cv$performance_metric <- mlexperiments::metric("auc")
+    xgb_cv$learner_args<-c(as.list(param_list[i, ]),list(objective = "binary:logistic", eval_metric = "logloss", nrounds = 100L))
+    xgb_cv$performance_metric_args<-list(positive = "1")
+    xgb_cv$performance_metric<-mlexperiments::metric("auc")
     xgb_cv$set_data(x = X_tr, y = y_tr)
     
     # Executing CV tuning
-    res_cv <- xgb_cv$execute()
+    res_cv<-xgb_cv$execute()
     
     # Calculating the mean AUROC
-    mean_auc <- mean(sapply(res_cv$results$folds, function(f) f[[5]]$performance))
+    mean_auc<-mean(sapply(res_cv$results$folds, function(f) f[[5]]$performance))
     
-    if (!is.na(mean_auc) && mean_auc > best_auc) {
+    if(!is.na(mean_auc) && mean_auc > best_auc){
       best_auc <- mean_auc
       best_params <- param_list[i, ]
     }
   }
   
   # If no params are selected, fallback to default
-  if (is.null(best_params)) {
-    best_params <- data.frame(
-      subsample = 1,
+  if(is.null(best_params)){
+    best_params <- data.frame(subsample = 1,
       colsample_bytree = 1,
       min_child_weight = 1,
       learning_rate = 0.1,
       max_depth = 3,
-      scale_pos_weight = Weight
-    )
+      scale_pos_weight = Weight)
   }
   
-  best_params_all[[outer_idx]] <- best_params
+  best_params_all[[outer_idx]]<-best_params
   
   ## Evaluating on outer fold
   
   # Building the model
-  dtrain <- xgboost::xgb.DMatrix(data = X_tr, label = y_tr)
-  dval   <- xgboost::xgb.DMatrix(data = X_val, label = y_val)
+  dtrain<-xgboost::xgb.DMatrix(data = X_tr, label = y_tr)
+  dval<-xgboost::xgb.DMatrix(data = X_val, label = y_val)
   
-  xgb_outer <- xgboost::xgb.train(
-    params = as.list(best_params),
+  xgb_outer<-xgboost::xgb.train(params = c(as.list(best_params), list(objective = "binary:logistic",eval_metric = "auc")),
     data = dtrain,
     nrounds = 100,
-    objective = "binary:logistic",
-    eval_metric = "auc",
-    verbose = 0
-  )
+    verbose = 0)
   
   # Assessing the performance
-  val_pred <- predict(xgb_outer, newdata = dval)
-  roc_curve <- pROC::roc(y_val, val_pred)
-  auc <- signif(pROC::auc(roc_curve), 3)
-  F1 <- MLmetrics::F1_Score(ifelse(val_pred > 0.5, 1, 0), y_val)
+  val_pred<-predict(xgb_outer, newdata = dval)
+  roc_curve<-pROC::roc(y_val, val_pred)
+  auc<-signif(pROC::auc(roc_curve), 3)
+  F1<-MLmetrics::F1_Score(ifelse(val_pred > 0.5, 1, 0), y_val)
   
   ## Saving CV results
-  outer_results[[outer_idx]] <- data.frame(Fold = outer_idx, AUROC = auc, F1 = F1)
+  outer_results[[outer_idx]]<-data.frame(Fold = outer_idx, AUROC = auc, F1 = F1)
 }
 
 # Combining results from outer CV into a summary table
-outer_summary <- dplyr::bind_rows(outer_results)
+outer_summary<-dplyr::bind_rows(outer_results)
 outer_summary
 
 #--------------------------
 ## Retraining final model on full training set
 
 # Picking the best params (e.g., from highest outer AUROC)
-best_idx <- which.max(outer_summary$AUROC)
-final_params <- best_params_all[[best_idx]]
+best_idx<-which.max(outer_summary$AUROC)
+final_params<-best_params_all[[best_idx]]
 
 # Retraining final model
-dtrain_full <- xgboost::xgb.DMatrix(data = X_train, label = y_train)
-xgb_final <- xgboost::xgb.train(
-  params = as.list(final_params),
-  data = dtrain_full,
-  nrounds = 100,
-  objective = "binary:logistic",
-  eval_metric = "auc",
-  verbose = 1
-)
+dtrain_full<-xgboost::xgb.DMatrix(data = X_train, label = y_train)
+xgb_final<-xgboost::xgb.train(params = c(as.list(final_params),list(objective = "binary:logistic",eval_metric = "auc")),
+  data=dtrain_full,
+  nrounds=100,
+  verbose=1)
 
 # Saving the final model
 saveRDS(xgb_final, file = "XGBoost_model.rds")
@@ -454,13 +521,13 @@ saveRDS(xgb_final, file = "XGBoost_model.rds")
 ## Final evaluation on holdout test dataset
 
 # Predicting outcome in holdout test dataset
-test_pred <- predict(xgb_final, newdata = X_test)
+test_pred<-predict(xgb_final, newdata = X_test)
 val_pred2<-ifelse(test_pred > 0.5, 1, 0)
 val_pred<-test_pred
 Val_obs<-y_test
 
 # AUROC
-roc_curve <- roc(Val_obs, val_pred) #AUROC curve
+roc_curve<-roc(Val_obs, val_pred) #AUROC curve
 AUC_CI<-signif(ci.auc(roc_curve),3) #AUROC 95% CI
 auc<-unique(median(AUC_CI)) #AUROC
 AUC_CI<-paste(unique(median(AUC_CI))," (",unique(min(AUC_CI)),"; ",unique(max(AUC_CI)),")",sep="")
@@ -557,13 +624,14 @@ for(n_var in 1:length(var_test)){
 
 #- - - - - - - - - -
 ## Calculating SHAP values
-contr <- predict(xgb_final, as.matrix(X_test[,xgb_final$feature_names]), predcontrib = TRUE)
+contr<-predict(xgb_final, as.matrix(X_test), predcontrib = TRUE)
 shap<-as_tibble(contr)
 shap_contrib <- as.data.table(contr)
 
 #- - - - - - - - - -
 ## Removing BIAS term
 shap_contrib <- shap_contrib[, !grepl("bias", names(shap_contrib), ignore.case = TRUE), with=FALSE]
+shap_contrib <- shap_contrib[, !grepl("(Intercept)", names(shap_contrib), ignore.case = TRUE), with=FALSE]
 
 #- - - - - - - - - -
 ## Computing mean SHAP score
@@ -617,7 +685,7 @@ shap_tempo <- shap %>%
   rowid_to_column("id") %>%
   pivot_longer(-id, names_to = "feature", values_to = "shap_value")
 
-tempopo <- X_test[, xgb_final$feature_names] %>%
+tempopo <- X_test %>%
   as_tibble() %>%
   rowid_to_column("id") %>%
   pivot_longer(-id, names_to = "feature", values_to = "feature_value")
@@ -626,7 +694,7 @@ tempopo <- left_join(tempopo, shap_tempo, by = c("id", "feature"))
 
 #- - - - - - - - - -
 ## SHAP summary and merging labels
-test_save<-xgb.ggplot.shap.summary(as.matrix(X_test[,xgb_final$feature_names]), contr, model = xgb_final,top_n=25)
+test_save<-xgb.ggplot.shap.summary(as.matrix(X_test), contr, model = xgb_final,top_n=25)
 test_save<-as_tibble(test_save$data)
 
 tempopo<-left_join(tempopo,Shap_val,by=base::intersect(colnames(tempopo),colnames(Shap_val)))
@@ -635,13 +703,19 @@ test3<-Shap_val %>% arrange(desc(as.numeric(mean_val)))
 
 #- - - - - - - - - -
 ## SHAP directionality
-direction_impact<-tempopo %>% group_by(feature) %>%
-  group_map(~tibble(feature=.y$feature,
-                    direction=determine_direction(.x,"feature_value","shap_value")
-  )) %>%
-  bind_rows
 
-test<-left_join(tempopo,direction_impact,by="feature")
+shap_contrib2<-shap_contrib
+colnames(shap_contrib2)<-paste("shap",colnames(shap_contrib2),sep="_")
+full_test<-bind_cols(X_test,shap_contrib2)
+
+direction_impact<-compute_shap_directions(data_df=full_test,
+                                           feature_cols=colnames(X_test),
+                                           methods=c("conventional","gam","pairwise"),
+                                           threshold=0.55,
+                                           n_bins=200) %>% select(-c(mean_shap,median_shap))
+
+test<-left_join(tempopo,direction_impact,by="feature") %>% 
+       mutate(direction=pairwise_bins) # selecting the pairwise-based approach, adapt if needed
 
 test<-left_join(test,Shap_val,by=base::intersect(colnames(test),colnames(Shap_val)))
 
@@ -651,9 +725,9 @@ test_tmp<-test %>% mutate(impact=direction) %>%
   mutate(mean_val=as.numeric(mean_val),
          IC_2.5=as.numeric(IC_2.5),
          IC_97.5=as.numeric(IC_97.5)) %>%
-  mutate(mean_val=if_else(impact=="mitigating predictor",-mean_val,mean_val),
-         IC_2.5=if_else(impact=="mitigating predictor",-IC_2.5,IC_2.5),
-         IC_97.5=if_else(impact=="mitigating predictor",-IC_97.5,IC_97.5))
+  mutate(mean_val=if_else(impact=="mitigating",-mean_val,mean_val),
+         IC_2.5=if_else(impact=="mitigating",-IC_2.5,IC_2.5),
+         IC_97.5=if_else(impact=="mitigating",-IC_97.5,IC_97.5))
 
 test_tmp<-test_tmp %>% arrange(desc(mean_val)) %>% filter(mean_val!=0) %>% filter(!is.na(mean_val))
 
@@ -666,7 +740,7 @@ ordre_def2<-test_tmp %>% filter(mean_val<0) %>% arrange(desc(IC_97.5))
 ordre_def<-bind_rows(ordre_def1,ordre_def2)
 
 test_tmp$feature<-factor(test_tmp$feature,levels=rev(unique(ordre_def$feature)))
-test_tmp$impact<-factor(test_tmp$impact,levels=c("mitigating predictor","neutral","promoting predictor"),
+test_tmp$impact<-factor(test_tmp$impact,levels=c("mitigating","neutral","promoting"),
                         labels=c("mitigating predictor","neutral","promoting predictor"))
 
 # Plot 1: error bar
@@ -678,19 +752,11 @@ plot1<-ggplot(test_tmp,aes(y=feature,x=mean_val,col=impact))+
                                                                                                    round(max(test_tmp$IC_97.5,na.rm=T)/10),
                                                                                                    -round(max(test_tmp$IC_97.5,na.rm=T)/10))))+
   scale_y_discrete("")+
-  theme_bw()+
   scale_color_manual("Direction:",
                      na.value="white",
                      values=rev(c("neutral"="black","promoting predictor"="#C35C33","mitigating predictor"="#40B696")))+
-  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
-        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
-        axis.text.y = element_text(size=16,color="black"),
-        axis.text.x = element_text(size=16,color="black"),
-        axis.title=element_text(size=16,face="bold",color="black"),
-        legend.text = element_text(size = 16, face = "bold"),
-        legend.title = element_text(size = 16, face = "bold"),
-        legend.position="bottom",
-        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+  theme_Gaia()+
+  theme(legend.position="bottom")
 
 # Exporting plot 1
 ggsave(plot1,
@@ -709,18 +775,11 @@ plot2<-ggplot(test_tmp,aes(y=feature,x=mean_val,fill=impact))+
                                                                                                  -round(max(test_tmp$mean_val,na.rm=T)/10))))+
   scale_x_continuous("mean |SHAP value|",label=function(x) abs(x))+
   scale_y_discrete("")+
-  theme_bw()+
   scale_fill_manual("Direction:",
                     na.value="white",
                     values=c("mitigating predictor"="#A6DDCE","promoting predictor"="#F9CBC2","neutral"="white"))+
-  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
-        strip.background = element_rect(fill="#A6DDCE", colour="black", size=1),
-        axis.text = element_text(size=16,color="black", face = "bold"),
-        axis.title=element_text(size=16,face="bold",color="black"),
-        legend.text = element_text(size = 16, face = "bold"),
-        legend.title = element_text(size = 16, face = "bold"),
-        legend.position="bottom",
-        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+  theme_Gaia()+
+  theme(legend.position="bottom")
 
 # Exporting plot 2
 ggsave(plot2,
@@ -766,17 +825,41 @@ plot3<-ggplot2::ggplot(test3, ggplot2::aes(x = feature, y = shap_value,colour = 
   scale_y_continuous("SHAP value (impact on model output)",limits=c(bornes_shap$min,bornes_shap$max*1.5))+
   ggplot2::coord_flip()+
   geom_text(data=test2,aes(x = feature, y = bornes_shap$max*1.35,label=mean_SHAP),size=5,col="black")+
-  theme_bw()+
-  theme(strip.text.x = element_text(size = 16, colour = "black", angle = 0),
-        strip.background = element_rect(fill=scales::alpha('#009E73', 0.2), colour="black", size=1),
-        axis.text = element_text(size=16,color="black"),
-        axis.title=element_text(size=16,face="bold",color="black"),
-        legend.text = element_text(size = 16, face = "bold"),
-        axis.line = element_line(color = "black",size = 0.1, linetype = "solid"))
+  theme_Gaia()
 
 # Exporting plot 3
 ggsave(plot3,
        file=paste("SHAP_dispersion_",
+                  Sys.Date(),".pdf",sep=""),
+       dpi=600,width=60,height=30,units = "cm",limitsize=F)
+
+#- - - - - - - - - -
+## SHAP direction comparison
+
+dir_long<-direction_impact %>%
+  dplyr::select(feature, conventional, gam_deriv, pairwise_bins) %>%
+  tidyr::pivot_longer(-feature, names_to="method", values_to="direction") %>%
+  mutate(direction=factor(direction,levels = c("promoting","neutral","mitigating","undefined")),
+         method=factor(method,
+                       levels = c("conventional","gam_deriv","pairwise_bins"),
+                       labels = c("Conventional\n(mean sign)",
+                                  "Approach 1\n(GAM derivative)",
+                                  "Approach 2\n(Pairwise bins)")))
+
+plot4<-ggplot(dir_long, aes(x=method, y=feature, fill=direction)) +
+  geom_tile(color="white", linewidth=0.8) +
+  scale_fill_manual(values = c("promoting"="#A6DDCE",
+                               "neutral"="#f7f7f7",
+                               "mitigating"="#F9CBC2",
+                               "undefined"="grey80"),
+                    na.value="grey80") +
+  labs(title="", x = "", y = "Feature", fill = "Direction") +
+  theme_Gaia()+
+  theme(legend.position="top")
+
+# Exporting plot
+ggsave(plot4,
+       file=paste("SHAP direction comparison_",
                   Sys.Date(),".pdf",sep=""),
        dpi=600,width=60,height=30,units = "cm",limitsize=F)
 
@@ -787,7 +870,7 @@ tmp_GLM<-Association_tab_res %>% select(term,OR,direction,p.value,Log_loss)
 colnames(tmp_GLM)<-c("feature","OR [95% CI]","GLM - association direction","GLM - p-value","GLM - log loss")
 
 test_SHAP_tmp<-test %>%  
-  select(feature,mean_SHAP,direction,mean_val) %>% 
+  select(feature,mean_SHAP,direction,conventional,gam_deriv,pairwise_bins,mean_val) %>% 
   distinct %>%
   arrange(desc(abs(as.numeric(mean_val)))) %>%
   rowwise %>%
@@ -795,7 +878,8 @@ test_SHAP_tmp<-test %>%
   ungroup %>%
   select(-c(mean_val))
 
-colnames(test_SHAP_tmp)<-c("feature","mean_abs_SHAP [95% CI]","SHAP direction")
+colnames(test_SHAP_tmp)<-c("feature","mean absolute SHAP [95% CI]","SHAP direction",
+                           "conventional SHAP direction","GAM-based SHAP direction","Pairwise-based SHAP direction")
 
 Compa_GLM_SHAP<-left_join(test_SHAP_tmp,tmp_GLM,by="feature")
 
