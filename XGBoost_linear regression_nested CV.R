@@ -303,7 +303,7 @@ pairwise_direction<-function(df, feature_col, shap_col,majority_threshold = 0.55
   return("neutral")
 }
 
-## Reusable wrapper: computing directions for all features
+## Reusable wrapper: computing directions for all features using a wide-format dataset
 compute_shap_directions<-function(data_df, feature_cols,shap_prefix="shap_",
                                   methods=c("conventional","gam","pairwise"),
                                   threshold=0.55,n_bins=200) {
@@ -328,6 +328,24 @@ compute_shap_directions<-function(data_df, feature_cols,shap_prefix="shap_",
   })
   
   do.call(rbind, Filter(Negate(is.null), res))
+}
+
+## Reusable wrapper: computing directions for all features using a long-format dataset
+compute_shap_directions_long<-function(long_df,threshold,n_bins){
+  long_df %>%
+    group_split(feature) %>%
+    map_dfr(function(df_feat) {
+      f<-as.character(df_feat$feature[1])
+      tmp<-data.frame(x = df_feat$feature_value,  s = df_feat$shap_value)
+      
+      tibble(feature = f,
+             n = nrow(df_feat),
+             mean_shap = mean(df_feat$shap_value, na.rm = TRUE),
+             median_shap = median(df_feat$shap_value, na.rm = TRUE),
+             conventional = conventional_direction(tmp, "x", "s"),
+             gam = gam_direction(tmp, "x", "s"),
+             pairwise = pairwise_direction(tmp, "x", "s",majority_threshold=threshold,n_quantile_bins=n_bins))
+    })
 }
 
 ## not including function (opposite function of %in%)
@@ -658,18 +676,17 @@ test3<-Shap_val %>% arrange(desc(as.numeric(mean_val)))
 #- - - - - - - - - -
 ## SHAP directionality
 
-shap_contrib2<-shap_contrib
-colnames(shap_contrib2)<-paste("shap",colnames(shap_contrib2),sep="_")
-full_test<-bind_cols(X_test,shap_contrib2)
-
-direction_impact<-compute_shap_directions(data_df=full_test,
-                                          feature_cols=colnames(X_test),
-                                          methods=c("conventional","gam","pairwise"),
-                                          threshold=0.55,
-                                          n_bins=200) %>% select(-c(mean_shap,median_shap))
+direction_impact<-compute_shap_directions_long(tempopo,threshold = 0.55, n_bins = 200) %>% select(-c(n,mean_shap,median_shap)) %>%
+  filter(feature %ni% c("(Intercept)","BIAS","Bias")) %>%
+  # Consensus: majority vote across three methods
+  mutate(consensus=apply(cbind(conventional,gam, pairwise), 1,
+                         function(x) {
+                           tbl<-sort(table(x), decreasing = TRUE)
+                           if(tbl[1]>=2) names(tbl)[1] else "uncertain"
+                         }))
 
 test<-left_join(tempopo,direction_impact,by="feature") %>% 
-  mutate(direction=pairwise_bins) # selecting the pairwise-based approach, adapt if needed
+  mutate(direction=consensus) # selecting the consensus-based approach, adapt if needed
 
 test<-left_join(test,Shap_val,by=base::intersect(colnames(test),colnames(Shap_val)))
 
@@ -790,14 +807,15 @@ ggsave(plot3,
 ## SHAP direction comparison
 
 dir_long<-direction_impact %>%
-  dplyr::select(feature, conventional, gam_deriv, pairwise_bins) %>%
+  dplyr::select(feature, conventional, gam, pairwise,consensus) %>%
   tidyr::pivot_longer(-feature, names_to="method", values_to="direction") %>%
   mutate(direction=factor(direction,levels = c("promoting","neutral","mitigating","undefined")),
          method=factor(method,
-                       levels = c("conventional","gam_deriv","pairwise_bins"),
+                       levels = c("conventional","gam","pairwise","consensus"),
                        labels = c("Conventional\n(mean sign)",
                                   "Approach 1\n(GAM derivative)",
-                                  "Approach 2\n(Pairwise bins)")))
+                                  "Approach 2\n(pairwise bins)",
+                                  "Approach 3\n(consensus)")))
 
 plot4<-ggplot(dir_long, aes(x=method, y=feature, fill=direction)) +
   geom_tile(color="white", linewidth=0.8) +
@@ -823,7 +841,7 @@ tmp_GLM<-Association_tab_res %>% select(term,beta,direction,R2,p.value)
 colnames(tmp_GLM)<-c("feature","Beta [95% CI]","GLM - association direction","GLM - R2","GLM -p-value")
 
 test_SHAP_tmp<-test %>%  
-  select(feature,mean_SHAP,direction,conventional,gam_deriv,pairwise_bins,mean_val) %>% 
+  select(feature,mean_SHAP,direction,conventional,gam,pairwise,consensus,mean_val) %>% 
   distinct %>%
   arrange(desc(abs(as.numeric(mean_val)))) %>%
   rowwise %>%
@@ -832,7 +850,7 @@ test_SHAP_tmp<-test %>%
   select(-c(mean_val))
 
 colnames(test_SHAP_tmp)<-c("feature","mean absolute SHAP [95% CI]","SHAP direction",
-                           "conventional SHAP direction","GAM-based SHAP direction","Pairwise-based SHAP direction")
+                           "conventional SHAP direction","GAM-based SHAP direction","Pairwise-based SHAP direction","Consensus-based SHAP direction")
 
 Compa_GLM_SHAP<-left_join(test_SHAP_tmp,tmp_GLM,by="feature")
 
