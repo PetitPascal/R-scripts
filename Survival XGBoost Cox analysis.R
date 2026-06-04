@@ -1192,11 +1192,17 @@ ggsave(plot4,
 tmp_Cox<-Cox_tab_res %>% select(term,HR,direction,concordance,p.value.log)
 colnames(tmp_Cox)<-c("feature","HR [95% CI]","Cox - association direction","Cox - C-index","Cox - LR p-value")
 
-tmp_SHAP<-test %>% select(feature,mean_SHAP,direction,conventional,gam_deriv,pairwise_bins,mean_value) %>% distinct %>% 
-  arrange(desc(abs(as.numeric(mean_value)))) %>% select(-mean_value)
+tmp_SHAP<-test %>%  
+  select(feature,mean_SHAP,direction,conventional,gam,pairwise,consensus,mean_value) %>% 
+  distinct %>%
+  arrange(desc(abs(as.numeric(mean_value)))) %>%
+  rowwise %>%
+  mutate_if(is.numeric,test_format) %>%
+  ungroup %>%
+  select(-c(mean_value))
 
-colnames(tmp_SHAP)<-c("feature","mean |SHAP| value [95% CI]","SHAP direction",
-                      "conventional SHAP direction","GAM-based SHAP direction","Pairwise-based SHAP direction")
+colnames(tmp_SHAP)<-c("feature","mean absolute SHAP [95% CI]","SHAP direction",
+                      "conventional SHAP direction","GAM-based SHAP direction","Pairwise-based SHAP direction","Consensus-based SHAP direction")
 
 Compa_Cox_SHAP<-left_join(tmp_SHAP,tmp_Cox,by="feature")
 
