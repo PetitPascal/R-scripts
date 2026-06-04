@@ -102,9 +102,17 @@ Performs a Weighted Quantile Sum regression (WQS) analysis.
 
 Performs a Bayesian Weighted Quantile Sum regression (BWQS) analysis.
 
-•	*quantile_g_computation.R*
+•	*G-computation_continuous.R*
 
-Performs a quantile g-computation analysis.
+Performs a g-computation analysis for continuous outcomes.
+
+•	*G-computation_binary.R*
+
+Performs a g-computation analysis for binary outcomes.
+
+•	*G-computation_survival.R*
+
+Performs a g-computation analysis for survival outcomes.
 
 •	*DAG.R*
 
