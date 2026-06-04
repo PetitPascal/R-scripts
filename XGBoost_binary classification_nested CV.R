@@ -888,7 +888,7 @@ tmp_GLM<-Association_tab_res %>% select(term,OR,direction,p.value,Log_loss)
 colnames(tmp_GLM)<-c("feature","OR [95% CI]","GLM - association direction","GLM - p-value","GLM - log loss")
 
 test_SHAP_tmp<-test %>%  
-  select(feature,mean_SHAP,direction,conventional,gam_deriv,pairwise_bins,mean_val) %>% 
+  select(feature,mean_SHAP,direction,conventional,gam,pairwise,consensus,mean_val) %>% 
   distinct %>%
   arrange(desc(abs(as.numeric(mean_val)))) %>%
   rowwise %>%
@@ -897,7 +897,7 @@ test_SHAP_tmp<-test %>%
   select(-c(mean_val))
 
 colnames(test_SHAP_tmp)<-c("feature","mean absolute SHAP [95% CI]","SHAP direction",
-                           "conventional SHAP direction","GAM-based SHAP direction","Pairwise-based SHAP direction")
+                           "conventional SHAP direction","GAM-based SHAP direction","Pairwise-based SHAP direction","Consensus-based SHAP direction")
 
 Compa_GLM_SHAP<-left_join(test_SHAP_tmp,tmp_GLM,by="feature")
 
