@@ -4,6 +4,7 @@
 #   - Conventional approach (mean SHAP sign)
 #   - Approach 1: GAM derivative (+ Spearman fallback)
 #   - Approach 2: pairwise bin concordance
+#   - Approach 3: consensus of all approaches (majority voting)
 #   - Simulated dataset with monotonic, U-shaped, binary, threshold, and noise features
 #   - Comparison across all three approaches
 #   - Visualization: SHAP dependence plots, direction heatmap
@@ -243,7 +244,13 @@ results<-lapply(feature_cols, function(f){
              pairwise_bins=pair)
 })
 
-direction_df<-do.call(rbind, results)
+direction_df<-do.call(rbind, results) %>% 
+  # Consensus: majority vote across three methods
+  mutate(consensus=apply(cbind(conventional,gam_deriv, pairwise_bins), 1,
+                         function(x) {
+                           tbl<-sort(table(x), decreasing = TRUE)
+                           if(tbl[1]>=2) names(tbl)[1] else "uncertain"
+                         }))
 direction_df
 
 # True expected directions for comparison
@@ -255,15 +262,16 @@ left_join(direction_df,truth,by="feature")
 #--------------------------------------------
 ## Visualisation 1 — Direction heatmap
 
-dir_long <- direction_df %>%
-  dplyr::select(feature, conventional, gam_deriv, pairwise_bins) %>%
+dir_long<-direction_df %>%
+  dplyr::select(feature, conventional, gam_deriv, pairwise_bins,consensus) %>%
   tidyr::pivot_longer(-feature, names_to="method", values_to="direction") %>%
   mutate(direction=factor(direction,levels = c("promoting","neutral","mitigating","undefined")),
     method=factor(method,
-                       levels = c("conventional","gam_deriv","pairwise_bins"),
+                       levels = c("conventional","gam_deriv","pairwise_bins","consensus"),
                        labels = c("Conventional\n(mean sign)",
                                   "Approach 1\n(GAM derivative)",
-                                  "Approach 2\n(Pairwise bins)")))
+                                  "Approach 2\n(pairwise bins)",
+                                  "Approach 3\n(consensus)")))
 
 ggplot(dir_long, aes(x=method, y=feature, fill=direction)) +
   geom_tile(color="white", linewidth=0.8) +
@@ -362,7 +370,13 @@ compute_shap_directions<-function(data_df, feature_cols,shap_prefix="shap_",
     row
   })
   
-  do.call(rbind, Filter(Negate(is.null), res))
+  do.call(rbind, Filter(Negate(is.null), res)) %>%
+    # Consensus: majority vote across three methods
+    mutate(consensus=apply(cbind(conventional, gam_deriv, pairwise_bins), 1,
+                           function(x) {
+                             tbl<-sort(table(x), decreasing = TRUE)
+                             if(tbl[1]>=2) names(tbl)[1] else "uncertain"
+                           }))
 }
 
 # Applying the pipeline
