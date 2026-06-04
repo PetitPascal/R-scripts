@@ -290,7 +290,7 @@ pairwise_direction<-function(df, feature_col, shap_col,majority_threshold=0.55,n
   return("neutral")
 }
 
-## Reusable wrapper: computing directions for all features
+## Reusable wrapper: computing directions for all features using a wide-format dataset
 compute_shap_directions<-function(data_df, feature_cols,shap_prefix="shap_",
                                   methods=c("conventional","gam","pairwise"),
                                   threshold=0.55,n_bins=200) {
@@ -315,6 +315,24 @@ compute_shap_directions<-function(data_df, feature_cols,shap_prefix="shap_",
   })
   
   do.call(rbind, Filter(Negate(is.null), res))
+}
+
+## Reusable wrapper: computing directions for all features using a long-format dataset
+compute_shap_directions_long<-function(long_df,threshold,n_bins){
+  long_df %>%
+    group_split(feature) %>%
+    map_dfr(function(df_feat) {
+      f<-as.character(df_feat$feature[1])
+      tmp<-data.frame(x = df_feat$feature_value,  s = df_feat$shap_value)
+      
+      tibble(feature = f,
+             n = nrow(df_feat),
+             mean_shap = mean(df_feat$shap_value, na.rm = TRUE),
+             median_shap = median(df_feat$shap_value, na.rm = TRUE),
+             conventional = conventional_direction(tmp, "x", "s"),
+             gam = gam_direction(tmp, "x", "s"),
+             pairwise = pairwise_direction(tmp, "x", "s",majority_threshold=threshold,n_quantile_bins=n_bins))
+    })
 }
 
 #----------------------------------------------------------------
@@ -934,18 +952,17 @@ test3<-Shap_val %>% arrange(desc(as.numeric(mean_value)))
 #- - - - - - - - - -
 ## SHAP directionality summary
 
-shap_contrib2<-shap_contrib
-colnames(shap_contrib2)<-paste("shap",colnames(shap_contrib2),sep="_")
-full_test<-bind_cols(test_x,shap_contrib2)
-
-direction_impact<-compute_shap_directions(data_df=full_test,
-                                          feature_cols=colnames(test_x),
-                                          methods=c("conventional","gam","pairwise"),
-                                          threshold=0.55,
-                                          n_bins=200) %>% select(-c(mean_shap,median_shap))
+direction_impact<-compute_shap_directions_long(tempopo,threshold = 0.55, n_bins = 200) %>% select(-c(n,mean_shap,median_shap)) %>%
+  filter(feature %ni% c("(Intercept)","BIAS","Bias")) %>%
+  # Consensus: majority vote across three methods
+  mutate(consensus=apply(cbind(conventional,gam, pairwise), 1,
+                         function(x) {
+                           tbl<-sort(table(x), decreasing = TRUE)
+                           if(tbl[1]>=2) names(tbl)[1] else "uncertain"
+                         }))
 
 test<-left_join(tempopo,direction_impact,by="feature") %>% 
-  mutate(direction=pairwise_bins) # selecting the pairwise-based approach, adapt if needed
+  mutate(direction=consensus) # selecting the consensus-based approach, adapt if needed
 
 test<-left_join(test,Shap_val,by=base::intersect(colnames(test),colnames(Shap_val)))
 
@@ -960,6 +977,34 @@ test_tmp<-test %>% mutate(impact=direction) %>%
          IC_97.5=if_else(impact=="mitigating",-IC_97.5,IC_97.5))
 
 test_tmp<-test_tmp %>% arrange(desc(mean_value)) %>% filter(mean_value!=0) %>% filter(!is.na(mean_value))
+
+dir_long<-direction_impact %>%
+  dplyr::select(feature, conventional, gam, pairwise,consensus) %>%
+  tidyr::pivot_longer(-feature, names_to="method", values_to="direction") %>%
+  mutate(direction=factor(direction,levels = c("promoting","neutral","mitigating","undefined")),
+         method=factor(method,
+                       levels = c("conventional","gam","pairwise","consensus"),
+                       labels = c("Conventional\n(mean sign)",
+                                  "Approach 1\n(GAM derivative)",
+                                  "Approach 2\n(pairwise bins)",
+                                  "Approach 3\n(consensus)")))
+
+plot0<-ggplot(dir_long, aes(x=method, y=feature, fill=direction)) +
+  geom_tile(color="white", linewidth=0.8) +
+  scale_fill_manual(values = c("promoting"="#A6DDCE",
+                               "neutral"="#f7f7f7",
+                               "mitigating"="#F9CBC2",
+                               "undefined"="grey80"),
+                    na.value="grey80") +
+  labs(title="", x = "", y = "Feature", fill = "Direction") +
+  theme_Gaia()+
+  theme(legend.position="top")
+
+# Exporting plot
+ggsave(plot0,
+       file=paste("SHAP direction comparison_",
+                  Sys.Date(),".pdf",sep=""),
+       dpi=600,width=60,height=30,units = "cm",limitsize=F)
 
 #- - - - - - - - - -
 ## Plotting SHAP
