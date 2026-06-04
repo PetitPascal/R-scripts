@@ -598,10 +598,16 @@ shap_summary<-shap_all %>%
 #- - - - - - - - - -
 ## Computing SHAP directionality
 direction_impact<-compute_shap_directions_long(shap_long,threshold = 0.55, n_bins = 200) %>% select(-c(n,mean_shap,median_shap)) %>%
-                  filter(feature %ni% c("(Intercept)","BIAS","Bias"))
+                  filter(feature %ni% c("(Intercept)","BIAS","Bias")) %>%
+  # Consensus: majority vote across three methods
+  mutate(consensus=apply(cbind(conventional,gam, pairwise), 1,
+                         function(x) {
+                           tbl<-sort(table(x), decreasing = TRUE)
+                           if(tbl[1]>=2) names(tbl)[1] else "uncertain"
+                         }))
 
 shap_summary<-left_join(shap_summary, direction_impact, by="feature") %>%
-              mutate(direction=pairwise) # selecting the pairwise-based approach, adapt if needed
+              mutate(direction=consensus) # selecting the consensus-based approach, adapt if needed
 
 shap_summary_save<-shap_summary
 shap_summary<-shap_summary %>% filter(mean_abs_shap!=0) %>% 
@@ -613,7 +619,7 @@ shap_summary<-shap_summary %>% filter(mean_abs_shap!=0) %>%
 ## Creating long-format tibble for plotting
 shap_plot_df<-shap_all %>%
   left_join(direction_impact, by="feature") %>%
-  mutate(impact=pairwise) %>%  # selecting the pairwise-based approach, adapt if needed
+  mutate(impact=consensus) %>%  # selecting the consensus-based approach, adapt if needed
   filter(feature %ni% c("(Intercept)","BIAS","Bias"))
 
 #- - - - - - - - - -
@@ -669,14 +675,15 @@ ggsave(plot_bar, file=paste0("SHAP_barplot_", Sys.Date(), ".pdf"),
 ## Plot3: SHAP direction comparison
 
 dir_long<-direction_impact %>%
-  dplyr::select(feature, conventional, gam, pairwise) %>%
+  dplyr::select(feature, conventional, gam, pairwise,consensus) %>%
   tidyr::pivot_longer(-feature, names_to="method", values_to="direction") %>%
   mutate(direction=factor(direction,levels = c("promoting","neutral","mitigating","undefined")),
          method=factor(method,
-                       levels = c("conventional","gam","pairwise"),
+                       levels = c("conventional","gam","pairwise","consensus"),
                        labels = c("Conventional\n(mean sign)",
                                   "Approach 1\n(GAM derivative)",
-                                  "Approach 2\n(Pairwise bins)")))
+                                  "Approach 2\n(pairwise bins)",
+                                  "Approach 3\n(consensus)")))
 
 plot3<-ggplot(dir_long, aes(x=method, y=feature, fill=direction)) +
   geom_tile(color="white", linewidth=0.8) +
