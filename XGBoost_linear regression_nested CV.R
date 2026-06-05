@@ -5,10 +5,9 @@
 gctorture(FALSE)
 
 ## Installing and loading packages
-pack_needed<-c("data.table","tidyverse","mllrnrs","broom","doParallel","foreach",
-               "splitTools","conflicted","grid","gridExtra","RColorBrewer","mlbench",
-               "mlexperiments","caret","MLmetrics","patchwork","CardioDataSets","performance",
-               "xgboost","parallel","here","pROC","scales","dplyr", "ggplot2", "tidyr", "tibble","mgcv", "gratia", "shapr","iml", "Rcpp")
+pack_needed<-c("data.table","tidyverse","mllrnrs","broom","doParallel","foreach", "splitTools","conflicted","grid","gridExtra","RColorBrewer","mlbench",
+               "mlexperiments","caret","MLmetrics","patchwork","CardioDataSets","performance","xgboost","parallel","here","pROC","scales","dplyr",
+               "ggplot2", "tidyr", "tibble","mgcv", "gratia", "shapr","iml", "Rcpp")
 
 is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
 if(any(is_installed==FALSE)){
@@ -432,9 +431,6 @@ for(outer_idx in seq_along(outer_folds)){ # for each outer fold
   X_val<-X_train[val_idx, , drop=FALSE]
   y_val<-y_train[val_idx]
   
-  # Handling imbalance data
-  Weight<-max(table(y_tr)) / min(table(y_tr))
-  
   #--------------------------
   ## Performing the inner CV for tuning
   
@@ -446,8 +442,7 @@ for(outer_idx in seq_along(outer_folds)){ # for each outer fold
     colsample_bytree=seq(0.5, 1, 0.25),
     min_child_weight=c(1, 5, 10),
     learning_rate=c(0.05, 0.1, 0.3),
-    max_depth=c(3, 5, 7),
-    scale_pos_weight=Weight) %>% 
+    max_depth=c(3, 5, 7)) %>% 
     dplyr::slice_sample(n=30, replace=TRUE) # Limiting space to 30 combinations for computational efficiency and environmental sustainability considerations
   
   # Initializing best parameters
@@ -485,8 +480,7 @@ for(outer_idx in seq_along(outer_folds)){ # for each outer fold
       colsample_bytree=1,
       min_child_weight=1,
       learning_rate=0.1,
-      max_depth=3,
-      scale_pos_weight=Weight)
+      max_depth=3)
   }
   
   best_params_all[[outer_idx]]<-best_params
