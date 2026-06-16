@@ -67,6 +67,7 @@ par(mfrow=c(1, 1))
 check_normality(fit) # Checking normality of residuals
 lmtest::bptest(fit) # Checking homoscedasticity of residuals (Breusch-Pagan)
 check_heteroscedasticity(fit) # Checking homoscedasticity of residuals
+performance::check_model(fit) # checking all assumptions at once
 
 #--------------------------------------------
 ## Step 5: g-computation: Q25 vs. Q75
