@@ -70,6 +70,9 @@ performance::performance(fit)
 summary(fit)$deviance/summary(fit)$df.residual
 check_overdispersion(fit)
 
+# checking All assumptions at once
+performance::check_model(fit) 
+
 # Hosmer-Lemeshow test
 hl_test<-function(model, g=10){
   obs<-model$y
