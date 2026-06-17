@@ -114,6 +114,18 @@ Performs a g-computation analysis for binary outcomes.
 
 Performs a g-computation analysis for survival outcomes.
 
+•	*ERS_continuous.R*
+
+Implement a comprehensive pipeline for calculating an exposomic risk score (ERS) for a continuous outcome by residualizing the outcome on adjustment variables (cohort membership and/or covariates) using XGBoost with nested cross-validation.
+
+•	*ERS_binary.R*
+
+Implement a comprehensive pipeline for calculating an exposomic risk score (ERS) for a binary outcome by residualizing exposures on adjustment variables (cohort membership and/or covariates) using double machine learning via XGBoost with nested cross-validation.
+
+•	*ERS_survival.R*
+
+Implement a comprehensive pipeline for calculating an exposomic risk score (ERS) for a survival outcome by residualizing exposures on adjustment variables (cohort membership and/or covariates) using double machine learning via XGBoost with nested cross-validation.
+
 •	*DAG.R*
 
 Performs a directed acyclic graph (DAG) analysis.
