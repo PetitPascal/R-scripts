@@ -51,18 +51,10 @@ here::here("XGBoost - Ordinal logistic classification - nested CV")
 seed<-123
 
 ## Setting cores
-if (isTRUE(as.logical(Sys.getenv("_R_CHECK_LIMIT_CORES_")))) {
+if(isTRUE(as.logical(Sys.getenv("_R_CHECK_LIMIT_CORES_")))){
   ncores<-2L
-} else {
-  ncores<-ifelse(
-    test=parallel::detectCores() > 4,
-    yes=4L,
-    no=ifelse(
-      test=parallel::detectCores() < 2L,
-      yes=1L,
-      no=parallel::detectCores()
-    )
-  )
+}else{
+  ncores<-ifelse(test=parallel::detectCores() > 4,yes=4L,no=ifelse(test=parallel::detectCores() < 2L,yes=1L,no=parallel::detectCores()))
 }
 
 ## Setting mlexperiments package options
@@ -73,7 +65,9 @@ options("mlexperiments.optim.xgb.early_stopping_rounds"=10L)
 #----------------------------------------------------------------
 #### Creating functions ####
 
+#- - - - - -
 ## Function for plotting SHAP values
+
 plot.shap.summary<-function(data_long){
   x_bound<-max(abs(data_long$value))
   require('ggforce')
@@ -82,77 +76,49 @@ plot.shap.summary<-function(data_long){
     geom_sina(aes(x=variable, y=value, color=stdfvalue)) +
     geom_text(data=unique(data_long[, c("variable", "mean_value"), with=F]),
               aes(x=variable, y=-Inf, label=sprintf("%.3f", mean_value)),
-              size=3, alpha=0.7,
-              hjust=-0.2, 
-              fontface="bold") + # bold
-    scale_color_gradient(low="#FFCC33", high="#6600CC", 
-                         breaks=c(0,1), labels=c("Low","High")) +
+              size=3, alpha=0.7,hjust=-0.2, fontface="bold") +
+    scale_color_gradient(low="#FFCC33", high="#6600CC", breaks=c(0,1), labels=c("Low","High")) +
     theme_bw() + 
-    theme(axis.line.y=element_blank(), axis.ticks.y=element_blank(),
-          legend.position="bottom") + 
+    theme(axis.line.y=element_blank(), axis.ticks.y=element_blank(), legend.position="bottom") + 
     geom_hline(yintercept=0) +
     scale_y_continuous(limits=c(-x_bound, x_bound)) +
-    scale_x_discrete(limits=rev(levels(data_long$variable)) 
-    ) + 
+    scale_x_discrete(limits=rev(levels(data_long$variable))) + 
     labs(y="SHAP value (impact on model output)", x="", color="Feature value") 
   return(plot1)
 }
 
-## Function for standardizing feature values into the same range
+#- - - - - -
+## Standardizing feature values into [0,1]
+
 std1<-function(x){
-  return ((x - min(x, na.rm=T))/(max(x, na.rm=T) - min(x, na.rm=T)))
+  return((x - min(x, na.rm=T))/(max(x, na.rm=T) - min(x, na.rm=T)))
 }
 
-## Function for formatting the display of summary statistics
+#- - - - - -
+## Formatting summary statistics for display
+
 test_format<-function(x){
   x<-as.numeric(x)
   sign_x<-if_else(x<0,"neg","pos")
   x<-abs(x)
   x_raw<-x
-  
-  if(is.na(x)|x==""|x=="NA"|is.infinite(x)){
-    x_raw<-0
-  }
-  
+  if(is.na(x)|is.infinite(x)) x_raw<-0
   if(x_raw>=100){
     virg_pos<-str_locate(as.character(x_raw),"[.]")[1]
-    
     if(!is.na(virg_pos)&as.numeric(substr(x_raw,virg_pos+1,virg_pos+1))>=5){
       x<-x+1
       x<-as.numeric(substr(x,1,virg_pos-1))
     }
-    
   }
-  
-  if(is.na(x)|x==""|x=="NA"|is.infinite(x)){
+  if(is.na(x)|is.infinite(x)){
     x<-""
   }else{
-    
-    if(x<0.01|x>=10000){
-      x<-format(signif(x,3),scientific=T)
-      
-      if(nchar(x)==8&substr(x,4,4)!="e"){
-        if(as.numeric(substr(x,4,4))>=5&x<0.01){
-          
-          x1<-as.numeric(substr(x,1,4))+0.1
-          x2<-substr(x,5,8)
-          x<-paste(substr(x1,1,4),x2,sep="")
-        }else{
-          x<-paste(substr(x,1,4),substr(x,5,8),sep="")
-        }
-      }else{
-        x<-x
-      }
-      
+    if(x<0.05|x>=10000){
+      x<-format(signif(x,3), scientific=TRUE)
     }else{
-      
       x_save<-x
       x<-signif(x,3)
-      
-      if(nchar(x)==6){
-        x<-as.numeric(substr(x,1,5))
-      }
-      
+      if(nchar(x)==6) x<-as.numeric(substr(x,1,5))
       if(nchar(x)==5){
         if(as.numeric(substr(x,5,5))>=5){
           x<-x+0.01
@@ -161,28 +127,18 @@ test_format<-function(x){
           x<-substr(x,1,4)
         }
       }else{
-        if(x>=1000){
-          x<-as.character(signif(x_save,4))
-        }else{
-          x<-as.character(x)
-        }
+        if(x>=1000) x<-as.character(signif(x_save,4)) else x<-as.character(x)
       }
     }
-    
   }
-  
-  if(sign_x=="neg"&x_raw!=0){
-    x<-paste("-",x,sep="")
-  }
-  
-  if(x=="0e+00"){
-    x<-"0"
-  }
-  
+  if(sign_x=="neg"&x_raw!=0) x<-paste("-",x,sep="")
+  if(x=="0e+00") x<-"0"
   return(x)
 }
 
-## Function for customizing plots
+#- - - - - -
+## Custom ggplot theme
+
 theme_Gaia<-function(){
   theme_bw() +
     theme(strip.text=element_text(size=12, colour="black", face="bold"),
@@ -194,19 +150,19 @@ theme_Gaia<-function(){
           axis.line=element_line(color="black", linewidth=0.1))
 }
 
-#--------------------------------------------
-## Functions for determining the feature direction based on SHAP (i.e.: how a feature impacts the model)
+#- - - - - -
+## Functions for determining feature direction from SHAP values (i.e.: how a feature impacts the model)
 
-# Approach 1 - conventional (mean SHAP sign)
+# Approach 1: conventional (mean SHAP sign)
 
 conventional_direction<-function(df, feature_col, shap_col){
   s<-df[[shap_col]]
   mean_s<-mean(s, na.rm=TRUE)
-  if(abs(mean_s)< 1e-10) return("neutral")
+  if(abs(mean_s)<1e-10) return("neutral")
   ifelse(mean_s>0, "promoting", "mitigating")
 }
 
-# Approach 2 - GAM derivative (+ Spearman fallback)
+# Approach 2: GAM derivative + Spearman fallback
 
 gam_direction<-function(df, feature_col, shap_col){
   x<-df[[feature_col]]
@@ -216,51 +172,50 @@ gam_direction<-function(df, feature_col, shap_col){
   x<-x[valid]
   s<-s[valid]
   
-  if (length(unique(x)) <= 1 || length(unique(s)) <= 1) return("undefined")
+  if(length(unique(x)) <= 1 || length(unique(s)) <= 1) return("undefined")
   
   # Binary or sparse
-  if (length(unique(x)) <= 2 || quantile(x, 0.75, na.rm=TRUE) == 0) {
+  if(length(unique(x)) <= 2 || quantile(x, 0.75, na.rm=TRUE) == 0){
     mean_diff<-mean(s[x > 0], na.rm=TRUE) - mean(s[x <= 0], na.rm=TRUE)
-    return(ifelse(mean_diff > 0, "promoting",
-                  ifelse(mean_diff < 0, "mitigating", "neutral")))
+    return(ifelse(mean_diff > 0, "promoting",ifelse(mean_diff < 0, "mitigating", "neutral")))
   }
   
   # Continuous: GAM
   tryCatch({
-    gam_m <-mgcv::gam(s ~ s(x, bs="cr", k=8), method="REML")
+    gam_m<-mgcv::gam(s ~ s(x, bs="cr", k=8), method="REML")
     derivs<-gratia::derivatives(gam_m, term="s(x)")
     mean_d<-mean(derivs$derivative, na.rm=TRUE)
-    if (abs(mean_d) < 1e-10) return("neutral")
+    if(abs(mean_d) < 1e-10) return("neutral")
     return(ifelse(mean_d > 0, "promoting", "mitigating"))
-  }, error=function(e) {
+  }, error=function(e){
     rho<-suppressWarnings(cor(x, s, method="spearman"))
-    if (is.na(rho) || abs(rho) < 0.05) return("neutral")
+    if(is.na(rho) || abs(rho) < 0.05) return("neutral")
     return(ifelse(rho > 0, "promoting", "mitigating"))
   })
 }
 
-# Approach 3- Pairwise bin concordance (Rcpp)
+# Approach 3: Pairwise bin concordance (Rcpp)
 
-# Compile C++ function
-if (!exists("bin_pairwise_counts")) {
+# Compiling C++ function
+if(!exists("bin_pairwise_counts")){
   Rcpp::cppFunction('
 Rcpp::List bin_pairwise_counts(NumericVector bx, NumericVector bs,
-                               NumericVector bc) {
+                               NumericVector bc){
   int B=bx.size();
   double pos=0.0, neg=0.0, total=0.0;
-  for (int i=0; i < B; ++i) {
-    for (int j=i+1; j < B; ++j) {
+  for (int i=0; i < B; ++i){
+    for (int j=i+1; j < B; ++j){
       double ci=bc[i], cj=bc[j];
-      if (ci <= 0.0 || cj <= 0.0) continue;
+      if(ci <= 0.0 || cj <= 0.0) continue;
       double pairs=ci * cj;
-      if (bx[i] > bx[j]) {
+      if(bx[i] > bx[j]){
         total += pairs;
-        if (bs[i] > bs[j]) pos += pairs;
-        else if (bs[i] < bs[j]) neg += pairs;
-      } else if (bx[j] > bx[i]) {
+        if(bs[i] > bs[j]) pos += pairs;
+        else if(bs[i] < bs[j]) neg += pairs;
+      } else if(bx[j] > bx[i]){
         total += pairs;
-        if (bs[j] > bs[i]) pos += pairs;
-        else if (bs[j] < bs[i]) neg += pairs;
+        if(bs[j] > bs[i]) pos += pairs;
+        else if(bs[j] < bs[i]) neg += pairs;
       }
     }
   }
@@ -271,7 +226,7 @@ Rcpp::List bin_pairwise_counts(NumericVector bx, NumericVector bs,
 }', depends="Rcpp")
 }
 
-pairwise_direction<-function(df, feature_col, shap_col,majority_threshold=0.55,n_quantile_bins=200) {
+pairwise_direction<-function(df, feature_col, shap_col,majority_threshold=0.55,n_quantile_bins=200){
   x<-df[[feature_col]]
   s<-df[[shap_col]]
   valid<-complete.cases(x, s)
@@ -281,24 +236,25 @@ pairwise_direction<-function(df, feature_col, shap_col,majority_threshold=0.55,n
   if(length(unique(x)) <= 1 || length(unique(s)) <= 1) return("undefined")
   
   # Binary / sparse
-  if(length(unique(x)) <= 2 ||
-     quantile(x, 0.75, na.rm=TRUE) == 0) {
-    lv<-min(x); hv<-max(x)
-    g0<-s[x == lv]; g1<-s[x == hv]
-    if (length(g0)==0 || length(g1)==0) return("neutral")
+  if(length(unique(x)) <= 2 || quantile(x, 0.75, na.rm=TRUE) == 0){
+    lv<-min(x)
+    hv<-max(x)
+    g0<-s[x==lv]
+    g1<-s[x==hv]
+    if(length(g0)==0 || length(g1)==0) return("neutral")
     g0s<-sort(g0)
     pos<-sum(findInterval(g1, g0s, left.open=TRUE))
     tot<-as.double(length(g0)) * as.double(length(g1))
     pp<-pos/tot
-    if(pp >= majority_threshold) return("promoting")
-    if(pp <= 1-majority_threshold) return("mitigating")
+    if(pp>=majority_threshold) return("promoting")
+    if(pp<=1-majority_threshold) return("mitigating")
     return("neutral")
   }
   
   # Continuous: binning
   probs<-seq(0, 1, length.out=n_quantile_bins+1)
   breaks<-unique(quantile(x, probs=probs, na.rm=TRUE, type=7))
-  if (length(breaks) <= 2)
+  if(length(breaks) <= 2)
     breaks<-seq(min(x,na.rm=TRUE), max(x,na.rm=TRUE), length.out=3)
   bins<-cut(x, breaks=breaks, include.lowest=TRUE)
   
@@ -306,9 +262,11 @@ pairwise_direction<-function(df, feature_col, shap_col,majority_threshold=0.55,n
   bs<-as.numeric(tapply(s, bins, mean, na.rm=TRUE))
   bc<-as.numeric(tapply(s, bins, length))
   ok<-!is.na(bx) & !is.na(bs) & !is.na(bc)
-  bx<-bx[ok]; bs<-bs[ok]; bc<-bc[ok]
+  bx<-bx[ok]
+  bs<-bs[ok]
+  bc<-bc[ok]
   
-  if(length(bx) < 2) return("neutral")
+  if(length(bx)<2) return("neutral")
   
   cnts<-bin_pairwise_counts(bx, bs, bc)
   pos_p<-as.numeric(cnts$pos)
@@ -323,10 +281,10 @@ pairwise_direction<-function(df, feature_col, shap_col,majority_threshold=0.55,n
   return("neutral")
 }
 
-## Reusable wrapper: computing directions for all features using a wide-format dataset
+## Wrapper for computing SHAP directions from wide-format data
 compute_shap_directions<-function(data_df, feature_cols,shap_prefix="shap_",
                                   methods=c("conventional","gam","pairwise"),
-                                  threshold=0.55,n_bins=200) {
+                                  threshold=0.55,n_bins=200){
   
   res<-lapply(feature_cols, function(f){
     sc<-paste0(shap_prefix, f)
@@ -338,11 +296,11 @@ compute_shap_directions<-function(data_df, feature_cols,shap_prefix="shap_",
                     mean_shap=round(mean(data_df[[sc]], na.rm=TRUE), 5),
                     median_shap=round(median(data_df[[sc]],na.rm=TRUE),5))
     
-    if ("conventional" %in% methods)
+    if("conventional" %in% methods)
       row$conventional<-conventional_direction(data_df, f, sc)
-    if ("gam" %in% methods)
+    if("gam" %in% methods)
       row$gam_deriv<-gam_direction(data_df, f, sc)
-    if ("pairwise" %in% methods)
+    if("pairwise" %in% methods)
       row$pairwise_bins<-pairwise_direction(data_df, f, sc, majority_threshold=threshold,n_quantile_bins=n_bins)
     row
   })
@@ -350,11 +308,11 @@ compute_shap_directions<-function(data_df, feature_cols,shap_prefix="shap_",
   do.call(rbind, Filter(Negate(is.null), res))
 }
 
-## Reusable wrapper: computing directions for all features using a long-format dataset
+## Wrapper for computing SHAP directions from long-format data
 compute_shap_directions_long<-function(long_df,threshold,n_bins){
   long_df %>%
     group_split(feature) %>%
-    map_dfr(function(df_feat) {
+    map_dfr(function(df_feat){
       f<-as.character(df_feat$feature[1])
       tmp<-data.frame(x=df_feat$feature_value,  s=df_feat$shap_value)
       
@@ -368,7 +326,8 @@ compute_shap_directions_long<-function(long_df,threshold,n_bins){
     })
 }
 
-## not including function (opposite function of %in%)
+#- - - - - -
+## not-in operator
 `%ni%`<-Negate('%in%')
 
 #----------------------------------------------------------------
@@ -527,7 +486,7 @@ for(outer_idx in seq_along(outer_folds)){ # for each outer fold
   dtrain<-xgboost::xgb.DMatrix(data=X_tr, label=y_tr)
   dval<-xgboost::xgb.DMatrix(data=X_val, label=y_val)
   
-  xgb_outer<-xgboost::xgb.train(params=c(as.list(best_params),list(objective = "multi:softprob",num_class=num_class,eval_metric = "mlogloss")),
+  xgb_outer<-xgboost::xgb.train(params=c(as.list(best_params),list(objective="multi:softprob",num_class=num_class,eval_metric="mlogloss")),
     data=dtrain,
     nrounds=100,
     verbose=0)
@@ -555,13 +514,14 @@ final_params<-best_params_all[[best_idx]]
 
 # Retraining final model
 dtrain_full<-xgboost::xgb.DMatrix(data=X_train, label=y_train)
-xgb_final<-xgboost::xgb.train(params=c(as.list(final_params),list(objective = "multi:softprob",num_class=num_class,eval_metric = "mlogloss")),
+xgb_final<-xgboost::xgb.train(params=c(as.list(final_params),list(objective="multi:softprob",num_class=num_class,eval_metric="mlogloss")),
   data=dtrain_full,
   nrounds=100,
   verbose=1)
 
 # Saving the final model
 saveRDS(xgb_final, file="XGBoost_model.rds")
+xgb.save(xgb_final,paste0("XGBoost_model_",Sys.Date(),".ubj"))
 
 #--------------------------
 ## Final evaluation on holdout test dataset
@@ -748,12 +708,12 @@ test3<-Shap_val %>% arrange(desc(as.numeric(mean_val)))
 
 #- - - - - - - - - -
 ## SHAP directionality
-direction_impact<-compute_shap_directions_long(tempopo,threshold = 0.55, n_bins = 200) %>% select(-c(n,mean_shap,median_shap)) %>%
+direction_impact<-compute_shap_directions_long(tempopo,threshold=0.55, n_bins=200) %>% select(-c(n,mean_shap,median_shap)) %>%
   filter(feature %ni% c("(Intercept)","BIAS","Bias")) %>%
   # Consensus: majority vote across three methods
   mutate(consensus=apply(cbind(conventional,gam, pairwise), 1,
-                         function(x) {
-                           tbl<-sort(table(x), decreasing = TRUE)
+                         function(x){
+                           tbl<-sort(table(x), decreasing=TRUE)
                            if(tbl[1]>=2) names(tbl)[1] else "uncertain"
                          }))
 
@@ -810,10 +770,7 @@ plot1<-ggplot(test_tmp,aes(y=feature,x=mean_val,col=impact))+
         axis.line=element_line(color="black",size=0.1, linetype="solid"))
 
 # Exporting plot 1
-ggsave(plot1,
-       file=paste("Across all classes_SHAP_errorbar_",
-                  Sys.Date(),".pdf",sep=""),
-       dpi=600,width=60,height=30,units="cm",limitsize=F)
+ggsave(plot1,file=paste("Across all classes_SHAP_errorbar_",Sys.Date(),".pdf",sep=""),dpi=600,width=60,height=30,units="cm",limitsize=F)
 
 # Plot 2: barplot
 ordre_def<-test_tmp %>% arrange(desc(mean_val))
@@ -840,39 +797,51 @@ plot2<-ggplot(test_tmp,aes(y=feature,x=mean_val,fill=impact))+
         axis.line=element_line(color="black",size=0.1, linetype="solid"))
 
 # Exporting plot 2
-ggsave(plot2,
-       file=paste("Across all classes_SHAP_barplot_",
-                  Sys.Date(),".pdf",sep=""),
-       dpi=600,width=60,height=30,units="cm",limitsize=F)
+ggsave(plot2,file=paste("Across all classes_SHAP_barplot_",Sys.Date(),".pdf",sep=""),dpi=600,width=60,height=30,units="cm",limitsize=F)
 
 # Plot 3: SHAP direction comparison
 dir_long<-direction_impact %>%
   dplyr::select(feature, conventional, gam, pairwise,consensus) %>%
   tidyr::pivot_longer(-feature, names_to="method", values_to="direction") %>%
-  mutate(direction=factor(direction,levels = c("promoting","neutral","mitigating","undefined")),
+  mutate(direction=factor(direction,levels=c("promoting","neutral","mitigating","undefined")),
          method=factor(method,
-                       levels = c("conventional","gam","pairwise","consensus"),
-                       labels = c("Conventional\n(mean sign)",
+                       levels=c("conventional","gam","pairwise","consensus"),
+                       labels=c("Conventional\n(mean sign)",
                                   "Approach 1\n(GAM derivative)",
                                   "Approach 2\n(pairwise bins)",
                                   "Approach 3\n(consensus)")))
 
 plot3<-ggplot(dir_long, aes(x=method, y=feature, fill=direction)) +
   geom_tile(color="white", linewidth=0.8) +
-  scale_fill_manual(values = c("promoting"="#A6DDCE",
-                               "neutral"="#f7f7f7",
-                               "mitigating"="#F9CBC2",
-                               "undefined"="grey80"),
-                    na.value="grey80") +
-  labs(title="", x = "", y = "Feature", fill = "Direction") +
+  scale_fill_manual(values=c("promoting"="#A6DDCE","neutral"="#f7f7f7","mitigating"="#F9CBC2","undefined"="grey80"),na.value="grey80") +
+  labs(title="", x="", y="Feature", fill="Direction") +
   theme_Gaia()+
   theme(legend.position="top")
 
 # Exporting plot
-ggsave(plot3,
-       file=paste("SHAP direction comparison_",
-                  Sys.Date(),".pdf",sep=""),
-       dpi=600,width=60,height=30,units = "cm",limitsize=F)
+ggsave(plot3,file=paste("Across all classes_SHAP direction comparison_",Sys.Date(),".pdf",sep=""),dpi=600,width=60,height=30,units="cm",limitsize=F)
+
+## Plot 4: SHAP percentage contribution 
+
+test_tmp<-test_tmp %>% mutate(SHAP_per=abs(mean_val)/sum(abs(mean_val))*100) # calculating the relative contribution to model output based on mean |SHAP|
+
+ordre_def2<-test_tmp %>% arrange(desc(SHAP_per))
+test_tmp$feature<-factor(test_tmp$feature, levels=rev(unique(ordre_def2$feature)))
+
+plot4<-ggplot(test_tmp, aes(y=feature, x=SHAP_per, fill=impact))+
+  geom_bar(stat="identity", col="black")+
+  geom_text(aes(x=SHAP_per, y=feature, label=paste0(signif(abs(SHAP_per),3),"%")), size=6,
+            position=position_nudge(x=if_else(test_tmp$SHAP_per>=0,
+                                              round(max(test_tmp$SHAP_per,na.rm=TRUE)/10),
+                                              -round(max(test_tmp$SHAP_per,na.rm=TRUE)/10))))+
+  scale_x_continuous("Relative contribution to model output (%)", label=function(x) paste0(abs(x)))+
+  scale_y_discrete("Feature")+
+  scale_fill_manual("Direction:", na.value="white",values=c("mitigating predictor"="#A6DDCE","promoting predictor"="#F9CBC2","neutral"="white"))+
+  theme_Gaia()+
+  theme(legend.position="bottom")
+
+# Exporting plot 4
+ggsave(plot4,file=paste("Across all classes_SHAP_contribution_",Sys.Date(),".pdf"),dpi=600,width=60,height=30,units="cm",limitsize=FALSE)
 
 #- - - - - - - - - -
 ## SHAP and CLM comparison
@@ -960,7 +929,7 @@ for(n_clust in 1:num_class){
   #- - - - - - - - - -
   ## Removing BIAS term
   shap_contrib<-shap_contrib[, !grepl("bias", names(shap_contrib), ignore.case=TRUE), with=FALSE]
-  shap_contrib<-shap_contrib[, !grepl("(Intercept)", names(shap_contrib), ignore.case = TRUE), with=FALSE]
+  shap_contrib<-shap_contrib[, !grepl("(Intercept)", names(shap_contrib), ignore.case=TRUE), with=FALSE]
   
   #- - - - - - - - - -
   ## Computing mean SHAP score
@@ -1030,12 +999,12 @@ for(n_clust in 1:num_class){
   #- - - - - - - - - -
   ## SHAP directionality
 
-  direction_impact<-compute_shap_directions_long(tempopo,threshold = 0.55, n_bins = 200) %>% select(-c(n,mean_shap,median_shap)) %>%
+  direction_impact<-compute_shap_directions_long(tempopo,threshold=0.55, n_bins=200) %>% select(-c(n,mean_shap,median_shap)) %>%
     filter(feature %ni% c("(Intercept)","BIAS","Bias")) %>%
     # Consensus: majority vote across three methods
     mutate(consensus=apply(cbind(conventional,gam, pairwise), 1,
-                           function(x) {
-                             tbl<-sort(table(x), decreasing = TRUE)
+                           function(x){
+                             tbl<-sort(table(x), decreasing=TRUE)
                              if(tbl[1]>=2) names(tbl)[1] else "uncertain"
                            }))
   
@@ -1095,10 +1064,7 @@ for(n_clust in 1:num_class){
           axis.line=element_line(color="black",size=0.1, linetype="solid"))
   
   # Exporting plot 1
-  ggsave(plot1,
-         file=paste("Class ",n_clust,"_SHAP_errorbar_",
-                    Sys.Date(),".pdf",sep=""),
-         dpi=600,width=60,height=30,units="cm",limitsize=F)
+  ggsave(plot1,file=paste("Class ",n_clust,"_SHAP_errorbar_",Sys.Date(),".pdf",sep=""),dpi=600,width=60,height=30,units="cm",limitsize=F)
   
   # Plot 2: barplot
   ordre_def<-test_tmp %>% arrange(desc(mean_val))
@@ -1125,39 +1091,52 @@ for(n_clust in 1:num_class){
           axis.line=element_line(color="black",size=0.1, linetype="solid"))
   
   # Exporting plot 2
-  ggsave(plot2,
-         file=paste("Class ",n_clust,"_SHAP_barplot_",
-                    Sys.Date(),".pdf",sep=""),
-         dpi=600,width=60,height=30,units="cm",limitsize=F)
+  ggsave(plot2,file=paste("Class ",n_clust,"_SHAP_barplot_",Sys.Date(),".pdf",sep=""),dpi=600,width=60,height=30,units="cm",limitsize=F)
   
   # Plot 3: direction comparison
   dir_long<-direction_impact %>%
     dplyr::select(feature, conventional, gam, pairwise,consensus) %>%
     tidyr::pivot_longer(-feature, names_to="method", values_to="direction") %>%
-    mutate(direction=factor(direction,levels = c("promoting","neutral","mitigating","undefined")),
+    mutate(direction=factor(direction,levels=c("promoting","neutral","mitigating","undefined")),
            method=factor(method,
-                         levels = c("conventional","gam","pairwise","consensus"),
-                         labels = c("Conventional\n(mean sign)",
+                         levels=c("conventional","gam","pairwise","consensus"),
+                         labels=c("Conventional\n(mean sign)",
                                     "Approach 1\n(GAM derivative)",
                                     "Approach 2\n(pairwise bins)",
                                     "Approach 3\n(consensus)")))
   
   plot3<-ggplot(dir_long, aes(x=method, y=feature, fill=direction)) +
     geom_tile(color="white", linewidth=0.8) +
-    scale_fill_manual(values = c("promoting"="#A6DDCE",
-                                 "neutral"="#f7f7f7",
-                                 "mitigating"="#F9CBC2",
-                                 "undefined"="grey80"),
-                      na.value="grey80") +
-    labs(title="", x = "", y = "Feature", fill = "Direction") +
+    scale_fill_manual(values=c("promoting"="#A6DDCE","neutral"="#f7f7f7","mitigating"="#F9CBC2","undefined"="grey80"),na.value="grey80") +
+    labs(title="", x="", y="Feature", fill="Direction") +
     theme_Gaia()+
     theme(legend.position="top")
   
   # Exporting plot
-  ggsave(plot3,
-         file=paste("Class ",n_clust,"_SHAP direction comparison_",
-                    Sys.Date(),".pdf",sep=""),
-         dpi=600,width=60,height=30,units = "cm",limitsize=F)
+  ggsave(plot3,file=paste("Class ",n_clust,"_SHAP direction comparison_",Sys.Date(),".pdf",sep=""),dpi=600,width=60,height=30,units="cm",limitsize=F)
+  
+  ## Plot 4: SHAP percentage contribution 
+  
+  test_tmp<-test_tmp %>% mutate(SHAP_per=abs(mean_val)/sum(abs(mean_val))*100) # calculating the relative contribution to model output based on mean |SHAP|
+  
+  ordre_def2<-test_tmp %>% arrange(desc(SHAP_per))
+  test_tmp$feature<-factor(test_tmp$feature, levels=rev(unique(ordre_def2$feature)))
+  
+  plot4<-ggplot(test_tmp, aes(y=feature, x=SHAP_per, fill=impact))+
+    geom_bar(stat="identity", col="black")+
+    geom_text(aes(x=SHAP_per, y=feature, label=paste0(signif(abs(SHAP_per),3),"%")), size=6,
+              position=position_nudge(x=if_else(test_tmp$SHAP_per>=0,
+                                                round(max(test_tmp$SHAP_per,na.rm=TRUE)/10),
+                                                -round(max(test_tmp$SHAP_per,na.rm=TRUE)/10))))+
+    scale_x_continuous("Relative contribution to model output (%)", label=function(x) paste0(abs(x)))+
+    scale_y_discrete("Feature")+
+    scale_fill_manual("Direction:", na.value="white",
+                      values=c("mitigating predictor"="#A6DDCE","promoting predictor"="#F9CBC2","neutral"="white"))+
+    theme_Gaia()+
+    theme(legend.position="bottom")
+  
+  # Exporting plot 4
+  ggsave(plot4,file=paste("Class ",n_clust,"_SHAP_contribution_",Sys.Date(),".pdf"),dpi=600,width=60,height=30,units="cm",limitsize=FALSE)
   
   #- - - - - - - - - -
   ## SHAP and GLM comparison
