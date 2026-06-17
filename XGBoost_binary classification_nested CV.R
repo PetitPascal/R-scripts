@@ -717,8 +717,9 @@ ordre_def2<-test_tmp %>% filter(mean_val<0) %>% arrange(desc(IC_97.5))
 ordre_def<-bind_rows(ordre_def1,ordre_def2)
 
 test_tmp$feature<-factor(test_tmp$feature,levels=rev(unique(ordre_def$feature)))
-test_tmp$impact<-factor(test_tmp$impact,levels=c("mitigating","neutral","promoting"),
-                        labels=c("mitigating predictor","neutral","promoting predictor"))
+test_tmp$impact<-factor(test_tmp$impact,
+                        levels=c("mitigating","neutral","promoting","uncertain","undefined"),
+                        labels=c("mitigating predictor","neutral","promoting predictor","uncertain","undefined"))
 
 # Plot 1: error bar
 plot1<-ggplot(test_tmp,aes(y=feature,x=mean_val,col=impact))+
@@ -729,7 +730,9 @@ plot1<-ggplot(test_tmp,aes(y=feature,x=mean_val,col=impact))+
                                                                                                    round(max(test_tmp$IC_97.5,na.rm=T)/10),
                                                                                                    -round(max(test_tmp$IC_97.5,na.rm=T)/10))))+
   scale_y_discrete("")+
-  scale_color_manual("Direction:",na.value="white",values=rev(c("neutral"="black","promoting predictor"="#C35C33","mitigating predictor"="#40B696")))+
+  scale_color_manual("Direction:",na.value="white",
+                     values=rev(c("neutral"="grey80","promoting predictor"="#C35C33","mitigating predictor"="#40B696",
+                                  "uncertain"="black","undefined"="grey50")))+
   theme_Gaia()+
   theme(legend.position="bottom")
 
@@ -747,7 +750,8 @@ plot2<-ggplot(test_tmp,aes(y=feature,x=mean_val,fill=impact))+
                                                                                                  -round(max(test_tmp$mean_val,na.rm=T)/10))))+
   scale_x_continuous("mean |SHAP value|",label=function(x) abs(x))+
   scale_y_discrete("")+
-  scale_fill_manual("Direction:",na.value="white",values=c("mitigating predictor"="#A6DDCE","promoting predictor"="#F9CBC2","neutral"="white"))+
+  scale_fill_manual("Direction:",na.value="white",
+                    values=c("mitigating predictor"="#A6DDCE","promoting predictor"="#F9CBC2","neutral"="white","uncertain"="grey","undefined"="grey50"))+
   theme_Gaia()+
   theme(legend.position="bottom")
 
@@ -805,13 +809,14 @@ test_tmp$feature<-factor(test_tmp$feature, levels=rev(unique(ordre_def2$feature)
 
 plot4<-ggplot(test_tmp, aes(y=feature, x=SHAP_per, fill=impact))+
   geom_bar(stat="identity", col="black")+
-  geom_text(aes(x=SHAP_per, y=feature, label=paste0(signif(abs(SHAP_per),3),"%")), size=6,
+  geom_text(aes(x=SHAP_per, y=feature, label=paste0(signif(abs(SHAP_per),3))), size=6,
             position=position_nudge(x=if_else(test_tmp$SHAP_per>=0,
                                               round(max(test_tmp$SHAP_per,na.rm=TRUE)/10),
                                               -round(max(test_tmp$SHAP_per,na.rm=TRUE)/10))))+
   scale_x_continuous("Relative contribution to model output (%)", label=function(x) paste0(abs(x)))+
   scale_y_discrete("Feature")+
-  scale_fill_manual("Direction:", na.value="white",values=c("mitigating predictor"="#A6DDCE","promoting predictor"="#F9CBC2","neutral"="white"))+
+  scale_fill_manual("Direction:",na.value="white",
+                    values=c("mitigating predictor"="#A6DDCE","promoting predictor"="#F9CBC2","neutral"="white","uncertain"="grey","undefined"="grey50"))+
   theme_Gaia()+
   theme(legend.position="bottom")
 
@@ -822,20 +827,19 @@ ggsave(plot4,file=paste0("SHAP_contribution_",Sys.Date(),".pdf"),dpi=600,width=6
 ## SHAP direction comparison
 
 dir_long<-direction_impact %>%
-  dplyr::select(feature, conventional, gam, pairwise,consensus) %>%
-  tidyr::pivot_longer(-feature, names_to="method", values_to="direction") %>%
-  mutate(direction=factor(direction,levels = c("promoting","neutral","mitigating","undefined")),
+  select(feature,conventional,gam,pairwise,consensus) %>%
+  pivot_longer(-feature, names_to="method", values_to="direction") %>%
+  mutate(direction=factor(direction,levels=c("promoting","neutral","mitigating","undefined","uncertain")),
          method=factor(method,
-                       levels = c("conventional","gam","pairwise","consensus"),
-                       labels = c("Conventional\n(mean sign)",
-                                  "Approach 1\n(GAM derivative)",
-                                  "Approach 2\n(pairwise bins)",
-                                  "Approach 3\n(consensus)")))
+                       levels=c("conventional","gam","pairwise","consensus"),
+                       labels=c("Conventional\n(mean sign)","GAM derivative","Pairwise bins","Consensus")))
 
-plot5<-ggplot(dir_long, aes(x=method, y=feature, fill=direction)) +
-  geom_tile(color="white", linewidth=0.8) +
-  scale_fill_manual(values = c("promoting"="#A6DDCE","neutral"="#f7f7f7","mitigating"="#F9CBC2","undefined"="grey80"),na.value="grey80") +
-  labs(title="", x = "", y = "Feature", fill = "Direction") +
+plot5<-ggplot(dir_long,aes(x=method,y=feature,fill=direction))+
+  geom_tile(color="black")+
+  scale_fill_manual("Direction:",values=c("promoting"="#F9CBC2","neutral"="#f7f7f7","uncertain"="grey25",
+                                          "mitigating"="#A6DDCE","undefined"="grey75"),na.value="grey80")+
+  scale_x_discrete("",expand=c(0,0))+
+  scale_y_discrete("",expand=c(0,0))+
   theme_Gaia()+
   theme(legend.position="top")
 
