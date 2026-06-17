@@ -5,7 +5,7 @@
 gctorture(FALSE)
 
 ## Installing and loading packages
-pack_needed<-c("data.table","tidyverse","mllrnrs","mlsurvlrnrs","survival","splitTools","conflicted","mlexperiments","kdry","survminer","timeROC","cluster","pec",
+pack_needed<-c("data.table","tidyverse","mllrnrs","mlsurvlrnrs","survival","splitTools","conflicted","mlexperiments","kdry","survminer","timeROC","cluster","pec","ggsurvfit","ggkm",
                "factoextra","R6","xgboost","mgcv","quantreg","parallel","here","scales","dplyr", "ggplot2", "tidyr", "tibble","mgcv", "gratia", "shapr","iml","devtools", "Rcpp")
 
 if(!("ggkm"%in%.packages(all.available=TRUE))){
@@ -334,9 +334,9 @@ train_weights<-event_counts[train_data, on="Disease_status", weight]
 ## Creating cross-validation (CV) folds
 split_vector_train<-splitTools::multi_strata(dataset[data_split$train, ..surv_cols], strategy="kmeans", k=4)
 fold_list<-splitTools::create_folds(y=split_vector_train, 
-                                      k=5,  # 5-fold CV
-                                      type="stratified",
-                                      seed=seq(1,5,1)*123) # different random seed for each fold
+                                    k=5,  # 5-fold CV
+                                    type="stratified",
+                                    seed=seq(1,5,1)*123) # different random seed for each fold
 
 stopifnot(length(intersect(data_split$train, data_split$test))==0) # Ensuring no overlap
 
@@ -344,20 +344,20 @@ stopifnot(length(intersect(data_split$train, data_split$test))==0) # Ensuring no
 #### Customing the survival XGBoost Cox learner with sample weights support ####
 
 LearnerSurvXgboostCoxWeighted<-R6::R6Class(classname="LearnerSurvXgboostCoxWeighted",
-  inherit=mlsurvlrnrs::LearnerSurvXgboostCox,
-  public=list(sample_weight=NULL,
-    set_sample_weight=function(w){
-      self$sample_weight<-w
-    },
-    train=function(x, y, ...){
-      
-      if(!is.null(self$sample_weight)){
-        super$train(x=x, y=y, sample_weight=self$sample_weight, ...)
-      }else{
-        super$train(x=x, y=y, ...)
-      }
-    }
-  )
+                                           inherit=mlsurvlrnrs::LearnerSurvXgboostCox,
+                                           public=list(sample_weight=NULL,
+                                                       set_sample_weight=function(w){
+                                                         self$sample_weight<-w
+                                                       },
+                                                       train=function(x, y, ...){
+                                                         
+                                                         if(!is.null(self$sample_weight)){
+                                                           super$train(x=x, y=y, sample_weight=self$sample_weight, ...)
+                                                         }else{
+                                                           super$train(x=x, y=y, ...)
+                                                         }
+                                                       }
+                                           )
 )
 
 #----------------------------------------------------------------
@@ -379,11 +379,11 @@ return_models<-T
 
 # Grid search
 parameter_grid<-expand.grid(learning_rate=c(0.05, 0.1),
-  max_depth=c(3, 4, 5),
-  min_child_weight=c(5, 10, 20), # to avoid overfitting because small values cause instability
-  subsample=c(0.7, 0.9, 1.0), 
-  colsample_bytree=c(0.7, 0.9, 1.0),
-  nrounds=c(50, 100, 200))
+                            max_depth=c(3, 4, 5),
+                            min_child_weight=c(5, 10, 20), # to avoid overfitting because small values cause instability
+                            subsample=c(0.7, 0.9, 1.0), 
+                            colsample_bytree=c(0.7, 0.9, 1.0),
+                            nrounds=c(50, 100, 200))
 
 # Limiting grid search to a maximum of 10 rows for computational efficiency and environmental sustainability considerations
 if(nrow(parameter_grid) > 10){
@@ -399,11 +399,7 @@ learner<-LearnerSurvXgboostCoxWeighted$new(metric_optimization_higher_better=FAL
 learner$set_sample_weight(train_weights)
 
 # Initializing hyperparameter tuning
-tuner<-mlexperiments::MLTuneParameters$new(
-  learner=learner,
-  strategy="grid",
-  ncores=ncores,
-  seed=seed)
+tuner<-mlexperiments::MLTuneParameters$new(learner=learner,strategy="grid",ncores=ncores,seed=seed)
 
 # Setting tuning arguments
 tuner$parameter_grid<-parameter_grid
@@ -421,10 +417,7 @@ best_setting<-tuner$results$best.setting
 
 #- - - - - - - - - -
 ## Initializing cross validation
-validator<-mlexperiments::MLCrossValidation$new(learner=learner,
-  fold_list=fold_list,
-  ncores=ncores,
-  seed=seed)
+validator<-mlexperiments::MLCrossValidation$new(learner=learner,fold_list=fold_list,ncores=ncores,seed=seed)
 
 #- - - - - - - - - -
 ## Setting validator arguments
@@ -447,8 +440,8 @@ preds_xgboost<-mlexperiments::predictions(object=validator, newdata=test_x)
 #- - - - - - - - - -
 ## Evaluating performance on holdout test dataset
 perf_xgboost<-mlexperiments::performance(object=validator,
-                                           prediction_results=preds_xgboost,
-                                           y_ground_truth=test_y)
+                                         prediction_results=preds_xgboost,
+                                         y_ground_truth=test_y)
 
 #- - - - - - - - - -
 ## Identifying the best model (highest C index)
@@ -467,17 +460,17 @@ final_model$set_sample_weight(train_weights)
 
 # Training on full training set
 final_mod<-final_model$fit(x=train_x,
-  y=train_y,
-  seed=seed,
-  ncores=ncores,
-  objective=best_params$objective,
-  eval_metric=best_params$eval_metric,
-  subsample=best_params$subsample,
-  colsample_bytree=best_params$colsample_bytree,
-  min_child_weight=best_params$min_child_weight,
-  learning_rate=best_params$learning_rate,
-  nrounds=best_params$nrounds,
-  max_depth=best_params$max_depth)
+                           y=train_y,
+                           seed=seed,
+                           ncores=ncores,
+                           objective=best_params$objective,
+                           eval_metric=best_params$eval_metric,
+                           subsample=best_params$subsample,
+                           colsample_bytree=best_params$colsample_bytree,
+                           min_child_weight=best_params$min_child_weight,
+                           learning_rate=best_params$learning_rate,
+                           nrounds=best_params$nrounds,
+                           max_depth=best_params$max_depth)
 
 # Saving the final model
 saveRDS(final_mod, file="XGBoost_model.rds")
@@ -529,8 +522,8 @@ for(n_var in 1:length(var_test)){
 
 # Creating a data frame with predictions and outcomes
 risk_df<-data.frame(risk_score=preds_xgboost[["mean"]],
-                      time=test_y[, "time"],
-                      status=test_y[, "status"])
+                    time=test_y[, "time"],
+                    status=test_y[, "status"])
 
 # Creating sex groups
 risk_df$sex<-as.factor(unlist(dataset[data_split$test, "sex"]))
@@ -568,23 +561,105 @@ cox_model_tertiles<-coxph(Surv(time, status) ~ risk_group, data=risk_df)
 summary(cox_model_tertiles)
 
 #- - - - - - - - - -
-## Kaplan-Meier plot by sex
+#### Kaplan Meier - Sex
+
+#---
+## Baseline survival (overall)
+
+# version 1
+ggsurvplot(survfit(cox_model_sex, data = risk_df),
+           palette="#40B696",
+           risk.table=TRUE,
+           pval=TRUE,
+           conf.int=TRUE,
+           ggtheme=theme_Gaia(),
+           xlab="Time",
+           ylab="Overall survival probability")
+
+# version 2
+survfit2(cox_model_sex) %>%
+  ggsurvfit(color = "#40B696") +
+  labs(x = "Time", y = "Overall survival probability") +
+  add_confidence_interval(fill = "#40B696") +
+  add_risktable()+
+  theme_Gaia()           
+
+# version 3
+ggplot(risk_df, aes(time=time, status=status)) + geom_km() + geom_kmband() + theme_bw()+
+  scale_x_continuous("Time (years)")+
+  scale_y_continuous("Survival probability")+
+  theme(strip.text.x=element_text(size=16, colour="black", angle=0),
+        strip.background=element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y=element_text(size=16,color="black"),
+        axis.text.x=element_text(size=16,color="black"),
+        axis.title=element_text(size=16,face="bold",color="black"),
+        legend.text=element_text(size=16, face="bold"),
+        legend.title=element_text(size=16, face="bold"),
+        legend.position="top",
+        axis.line=element_line(color="black",size=0.1, linetype="solid"))
+
+#---
+## Cumulative events (overall)
+
+# version 1
+ggsurvplot(survfit(cox_model_sex, data = risk_df),
+           palette= "#40B696",
+           risk.table= TRUE,
+           pval= TRUE,
+           conf.int= TRUE,
+           ggtheme= theme_Gaia(),
+           xlab="Time",
+           ylab="Cumulative event probability",
+           fun="event")
+
+# version 2
+survfit2(cox_model_sex) %>%
+  ggsurvfit(color="#40B696",type="risk") +
+  labs(x = "Time", y = "Cumulative event probability") +
+  add_confidence_interval(fill = "#40B696") +
+  add_risktable()+
+  theme_Gaia()
+
+#---
+## Cumulative hazards (overall)
+
+# version 1
+ggsurvplot(survfit(cox_model_sex, data = risk_df),
+           palette= "#40B696",
+           risk.table= TRUE,
+           pval= TRUE,
+           conf.int= TRUE,
+           ggtheme= theme_Gaia(),
+           xlab="Time",
+           ylab="Cumulative hazard",
+           fun="cumhaz")
+
+# version 2
+survfit2(cox_model_sex) %>%
+  ggsurvfit(color="#40B696",type="cumhaz") +
+  labs(x = "Time", y = "Cumulative hazard") +
+  add_confidence_interval(fill = "#40B696") +
+  add_risktable()+
+  theme_Gaia()
+
+#---
+## Survival by sex
 
 # KM curve by predicted sex
 km_sex<-survfit(Surv(time, status) ~ sex, data=risk_df)
 
-# Plot - version 1
+# version 1
 survminer::ggsurvplot(km_sex,
-  data=risk_df,
-  risk.table=TRUE,
-  pval=TRUE,
-  palette=c("#40B696", "#F1CB0E"),
-  legend.title="Sex",
-  legend.labs=c("Male", "Female"),
-  xlab="Time",
-  ylab="Survival Probability")
+                      data=risk_df,
+                      risk.table=TRUE,
+                      pval=TRUE,
+                      palette=c("#40B696", "#F1CB0E"),
+                      legend.title="Sex",
+                      legend.labs=c("Male", "Female"),
+                      xlab="Time",
+                      ylab="Survival Probability")
 
-# Plot - version 2
+# version 2
 
 risk_df$sex<-factor(risk_df$sex,levels=c(0,1),labels=c("Male","Female"))
 
@@ -603,7 +678,7 @@ ggplot(risk_df, aes(time=time, status=status, fill=sex, color=sex)) + geom_km() 
         legend.position="top",
         axis.line=element_line(color="black",size=0.1, linetype="solid"))
 
-# Plot - version 3
+# version 3
 ggplot(risk_df, aes(time=time, status=status, fill=sex, color=sex)) + geom_km() + theme_bw()+
   scale_x_continuous("Time (years)")+
   scale_y_continuous("Survival probability")+
@@ -619,36 +694,165 @@ ggplot(risk_df, aes(time=time, status=status, fill=sex, color=sex)) + geom_km() 
         legend.position="top",
         axis.line=element_line(color="black",size=0.1, linetype="solid"))
 
-#- - - - - - - - - -
-## Kaplan-Meier plot by age groups
+#---
+## Cumulative events by sex
 
-# KM curve by predicted age
+# version 1
+ggsurvplot(km_sex,
+           ggtheme=theme_Gaia(),
+           data=risk_df,
+           risk.table=TRUE,
+           pval=TRUE,
+           conf.int=TRUE,
+           palette=c("#40B696","orange"),
+           legend.labs=c("Male","Female"),
+           xlab="Time",
+           ylab="Cumulative event probability",
+           fun="event")
+
+# version 2
+survfit2(Surv(time, status) ~ sex,data=risk_df) %>%
+  ggsurvfit(aes(color=sex,fill=sex),type="risk") +
+  labs(x = "Time", y = "Cumulative event probability") +
+  add_confidence_interval() +
+  add_risktable()+
+  scale_fill_manual("",values=c(Male="#40B696", Female="orange"))+
+  scale_color_manual("",values=c(Male="#40B696", Female="orange"))+
+  theme_Gaia()
+
+#---
+## Cumulative hazard by sex
+
+# version 1
+ggsurvplot(km_sex,
+           ggtheme=theme_Gaia(),
+           data=risk_df,
+           risk.table=TRUE,
+           pval=TRUE,
+           conf.int=TRUE,
+           palette=c("#40B696","orange"),
+           legend.labs=c("Male","Female"),
+           xlab="Time",
+           ylab="Cumulative hazard",
+           fun="cumhaz")
+
+# version 2
+survfit2(Surv(time, status) ~ sex,data=risk_df) %>%
+  ggsurvfit(aes(color=sex,fill=sex),type="cumhaz") +
+  labs(x = "Time", y = "Cumulative hazard") +
+  add_confidence_interval() +
+  add_risktable()+
+  scale_fill_manual("",values=c(Male="#40B696", Female="orange"))+
+  scale_color_manual("",values=c(Male="#40B696", Female="orange"))+
+  theme_Gaia()
+
+#- - - - - - - - - -
+#### Kaplan Meier - age group
+
+#---
+## Baseline survival (overall)
+
+# version 1
+ggsurvplot(survfit(cox_model_age, data = risk_df),
+           palette="#40B696",
+           risk.table=TRUE,
+           pval=TRUE,
+           conf.int=TRUE,
+           ggtheme=theme_Gaia(),
+           xlab="Time",
+           ylab="Overall survival probability")
+
+# version 2
+survfit2(cox_model_age) %>%
+  ggsurvfit(color = "#40B696") +
+  labs(x = "Time", y = "Overall survival probability") +
+  add_confidence_interval(fill = "#40B696") +
+  add_risktable()+
+  theme_Gaia()           
+
+# version 3
+ggplot(risk_df, aes(time=time, status=status)) + geom_km() + geom_kmband() + theme_bw()+
+  scale_x_continuous("Time (years)")+
+  scale_y_continuous("Survival probability")+
+  theme(strip.text.x=element_text(size=16, colour="black", angle=0),
+        strip.background=element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y=element_text(size=16,color="black"),
+        axis.text.x=element_text(size=16,color="black"),
+        axis.title=element_text(size=16,face="bold",color="black"),
+        legend.text=element_text(size=16, face="bold"),
+        legend.title=element_text(size=16, face="bold"),
+        legend.position="top",
+        axis.line=element_line(color="black",size=0.1, linetype="solid"))
+
+#---
+## Cumulative events (overall)
+
+# version 1
+ggsurvplot(survfit(cox_model_age, data = risk_df),
+           palette= "#40B696",
+           risk.table= TRUE,
+           pval= TRUE,
+           conf.int= TRUE,
+           ggtheme= theme_Gaia(),
+           xlab="Time",
+           ylab="Cumulative event probability",
+           fun="event")
+
+# version 2
+survfit2(cox_model_age) %>%
+  ggsurvfit(color="#40B696",type="risk") +
+  labs(x = "Time", y = "Cumulative event probability") +
+  add_confidence_interval(fill = "#40B696") +
+  add_risktable()+
+  theme_Gaia()
+
+#---
+## Cumulative hazards (overall)
+
+# version 1
+ggsurvplot(survfit(cox_model_age, data = risk_df),
+           palette= "#40B696",
+           risk.table= TRUE,
+           pval= TRUE,
+           conf.int= TRUE,
+           ggtheme= theme_Gaia(),
+           xlab="Time",
+           ylab="Cumulative hazard",
+           fun="cumhaz")
+
+# version 2
+survfit2(cox_model_age) %>%
+  ggsurvfit(color="#40B696",type="cumhaz") +
+  labs(x = "Time", y = "Cumulative hazard") +
+  add_confidence_interval(fill = "#40B696") +
+  add_risktable()+
+  theme_Gaia()
+
+#---
+## Survival by age group
+
+# KM curve by predicted age group
 km_age<-survfit(Surv(time, status) ~ age_group, data=risk_df)
 
-# Plot - version 1
+# version 1
 survminer::ggsurvplot(km_age,
-  data=risk_df,
-  risk.table=TRUE,
-  pval=TRUE,
-  palette=c("#40B696", "#F1CB0E"),
-  legend.title="Age Group",
-  legend.labs=c("<60", "≥60"))
+                      data=risk_df,
+                      risk.table=TRUE,
+                      pval=TRUE,
+                      palette=c("#40B696", "#F1CB0E"),
+                      legend.labs=c("<60", "≥60"),
+                      xlab="Time",
+                      ylab="Survival Probability")
 
-# Plot - version 2
+# version 2
+
+risk_df$age_group<-factor(risk_df$age_group,levels=c("<60", "≥60"),labels=c("<60", "≥60"))
+
 ggplot(risk_df, aes(time=time, status=status, fill=age_group, color=age_group)) + geom_km() + geom_kmband() + theme_bw()+
   scale_x_continuous("Time (years)")+
   scale_y_continuous("Survival probability")+
-  scale_fill_manual("Age group",values=c('≥60'="#40B696", '<60'="orange"))+
-  scale_color_manual("Age group",values=c('≥60'="#40B696", '<60'="orange"))+
-  theme(strip.text.x=element_text(size=16, colour="black", angle=0),
-        strip.background=element_rect(fill="#A6DDCE", colour="black", size=1),
-        axis.text.y=element_text(size=16,color="black"),
-        axis.text.x=element_text(size=16,color="black"),
-        axis.title=element_text(size=16,face="bold",color="black"),
-        legend.text=element_text(size=16, face="bold"),
-        legend.title=element_text(size=16, face="bold"),
-        legend.position="bottom",
-        axis.line=element_line(color="black",size=0.1, linetype="solid"))+
+  scale_fill_manual("",values=c('<60'="#40B696", '≥60'="orange"))+
+  scale_color_manual("",values=c('<60'="#40B696", '≥60'="orange"))+
   theme(strip.text.x=element_text(size=16, colour="black", angle=0),
         strip.background=element_rect(fill="#A6DDCE", colour="black", size=1),
         axis.text.y=element_text(size=16,color="black"),
@@ -659,21 +863,12 @@ ggplot(risk_df, aes(time=time, status=status, fill=age_group, color=age_group)) 
         legend.position="top",
         axis.line=element_line(color="black",size=0.1, linetype="solid"))
 
-# Plot - version 3
+# version 3
 ggplot(risk_df, aes(time=time, status=status, fill=age_group, color=age_group)) + geom_km() + theme_bw()+
   scale_x_continuous("Time (years)")+
   scale_y_continuous("Survival probability")+
-  scale_fill_manual("Age group",values=c('≥60'="#40B696", '<60'="orange"))+
-  scale_color_manual("Age group",values=c('≥60'="#40B696", '<60'="orange"))+
-  theme(strip.text.x=element_text(size=16, colour="black", angle=0),
-        strip.background=element_rect(fill="#A6DDCE", colour="black", size=1),
-        axis.text.y=element_text(size=16,color="black"),
-        axis.text.x=element_text(size=16,color="black"),
-        axis.title=element_text(size=16,face="bold",color="black"),
-        legend.text=element_text(size=16, face="bold"),
-        legend.title=element_text(size=16, face="bold"),
-        legend.position="bottom",
-        axis.line=element_line(color="black",size=0.1, linetype="solid"))+
+  scale_fill_manual("",values=c('<60'="#40B696", '≥60'="orange"))+
+  scale_color_manual("",values=c('<60'="#40B696", '≥60'="orange"))+
   theme(strip.text.x=element_text(size=16, colour="black", angle=0),
         strip.background=element_rect(fill="#A6DDCE", colour="black", size=1),
         axis.text.y=element_text(size=16,color="black"),
@@ -683,24 +878,77 @@ ggplot(risk_df, aes(time=time, status=status, fill=age_group, color=age_group)) 
         legend.title=element_text(size=16, face="bold"),
         legend.position="top",
         axis.line=element_line(color="black",size=0.1, linetype="solid"))
+
+#---
+## Cumulative events by age group
+
+# version 1
+ggsurvplot(km_age,
+           ggtheme=theme_Gaia(),
+           data=risk_df,
+           risk.table=TRUE,
+           pval=TRUE,
+           conf.int=TRUE,
+           palette=c("#40B696", "orange"),
+           legend.labs=c("<60", "≥60"),
+           xlab="Time",
+           ylab="Cumulative event probability",
+           fun="event")
+
+# version 2
+survfit2(Surv(time, status) ~ age_group,data=risk_df) %>%
+  ggsurvfit(aes(color=age_group,fill=age_group),type="risk") +
+  labs(x = "Time", y = "Cumulative event probability") +
+  add_confidence_interval() +
+  add_risktable()+
+  scale_fill_manual("",values=c('<60'="#40B696", '≥60'="orange"))+
+  scale_color_manual("",values=c('<60'="#40B696", '≥60'="orange"))+
+  theme_Gaia()
+
+#---
+## Cumulative hazard by age group
+
+# version 1
+ggsurvplot(km_age,
+           ggtheme=theme_Gaia(),
+           data=risk_df,
+           risk.table=TRUE,
+           pval=TRUE,
+           conf.int=TRUE,
+           palette=c("#40B696", "orange"),
+           legend.labs=c("<60", "≥60"),
+           xlab="Time",
+           ylab="Cumulative hazard",
+           fun="cumhaz")
+
+# version 2
+survfit2(Surv(time, status) ~ age_group,data=risk_df) %>%
+  ggsurvfit(aes(color=age_group,fill=age_group),type="cumhaz") +
+  labs(x = "Time", y = "Cumulative hazard") +
+  add_confidence_interval() +
+  add_risktable()+
+  scale_fill_manual("",values=c('<60'="#40B696", '≥60'="orange"))+
+  scale_color_manual("",values=c('<60'="#40B696", '≥60'="orange"))+
+  theme_Gaia()
 
 #- - - - - - - - - -
 ## Age and sex interaction
 
+#- - - -
 # KM curve - fitting survival curve
 surv_fit_sex_age<-survfit(Surv(time, status) ~ sex_age, data=risk_df)
 
 # Plot - version 1
 survminer::ggsurvplot(fit=surv_fit_sex_age,
-  data=risk_df,
-  risk.table=TRUE,
-  pval=TRUE,
-  conf.int=F,
-  palette="Set1",
-  legend.title="Predicted Risk × Age",
-  xlab="Time",
-  ylab="Survival probability",
-  ggtheme=theme_minimal())
+                      data=risk_df,
+                      risk.table=TRUE,
+                      pval=TRUE,
+                      conf.int=F,
+                      palette="Set1",
+                      legend.title="Predicted Risk × Age",
+                      xlab="Time",
+                      ylab="Survival probability",
+                      ggtheme=theme_minimal())
 
 # Plot - version 2
 risk_df$sex_age<-factor(risk_df$sex_age,levels=c("<60_0","≥60_0","<60_1","≥60_1"),labels=c("Male <60 yo","Male ≥60 yo","Female <60 yo","Female ≥60 yo"))
@@ -736,25 +984,159 @@ ggplot(risk_df, aes(time=time, status=status, fill=sex_age, color=sex_age)) + ge
         legend.position="top",
         axis.line=element_line(color="black",size=0.1, linetype="solid"))
 
+#- - - -
+# Cumulative events
+
+# version 1
+ggsurvplot(surv_fit_sex_age,
+           ggtheme=theme_Gaia(),
+           data=risk_df,
+           risk.table=TRUE,
+           pval=TRUE,
+           conf.int=TRUE,
+           palette=c("#40B696","#F9CBC2","#6495ED", "orange"),
+           legend.labs=c('Male <60 yo', 'Female <60 yo','Male ≥60 yo','Female ≥60 yo'),
+           xlab="Time",
+           ylab="Cumulative event probability",
+           fun="event")
+
+# version 2
+survfit2(Surv(time, status) ~ sex_age,data=risk_df) %>%
+  ggsurvfit(aes(color=sex_age,fill=sex_age),type="risk") +
+  labs(x = "Time", y = "Cumulative event probability") +
+  add_confidence_interval() +
+  add_risktable()+
+  scale_fill_manual("",values=c('Male <60 yo'="#40B696", 'Female <60 yo'="#F9CBC2",'Male ≥60 yo'="#6495ED", 'Female ≥60 yo'="orange"))+
+  scale_color_manual("",values=c('Male <60 yo'="#40B696", 'Female <60 yo'="#F9CBC2",'Male ≥60 yo'="#6495ED", 'Female ≥60 yo'="orange"))+
+  theme_Gaia()
+
+#- - - -
+# Cumulative hazard
+
+# version 1
+ggsurvplot(surv_fit_sex_age,
+           ggtheme=theme_Gaia(),
+           data=risk_df,
+           risk.table=TRUE,
+           pval=TRUE,
+           conf.int=TRUE,
+           palette=c("#40B696","#F9CBC2","#6495ED", "orange"),
+           legend.labs=c('Male <60 yo', 'Female <60 yo','Male ≥60 yo','Female ≥60 yo'),
+           xlab="Time",
+           ylab="Cumulative hazard",
+           fun="cumhaz")
+
+# version 2
+survfit2(Surv(time, status) ~ sex_age,data=risk_df) %>%
+  ggsurvfit(aes(color=sex_age,fill=sex_age),type="cumhaz") +
+  labs(x = "Time", y = "Cumulative hazard") +
+  add_confidence_interval() +
+  add_risktable()+
+  scale_fill_manual("",values=c('Male <60 yo'="#40B696", 'Female <60 yo'="#F9CBC2",'Male ≥60 yo'="#6495ED", 'Female ≥60 yo'="orange"))+
+  scale_color_manual("",values=c('Male <60 yo'="#40B696", 'Female <60 yo'="#F9CBC2",'Male ≥60 yo'="#6495ED", 'Female ≥60 yo'="orange"))+
+  theme_Gaia()
+
 #- - - - - - - - - -
-## Kaplan-Meier plot by risk tertile group
+#### Kaplan Meier - risk tertile group
+
+#---
+## Baseline survival (overall)
+
+# version 1
+ggsurvplot(survfit(cox_model_tertiles, data = risk_df),
+           palette="#40B696",
+           risk.table=TRUE,
+           pval=TRUE,
+           conf.int=TRUE,
+           ggtheme=theme_Gaia(),
+           xlab="Time",
+           ylab="Overall survival probability")
+
+# version 2
+survfit2(cox_model_tertiles) %>%
+  ggsurvfit(color = "#40B696") +
+  labs(x = "Time", y = "Overall survival probability") +
+  add_confidence_interval(fill = "#40B696") +
+  add_risktable()+
+  theme_Gaia()           
+
+# version 3
+ggplot(risk_df, aes(time=time, status=status)) + geom_km(color = "#40B696") + geom_kmband() + theme_bw()+
+  scale_x_continuous("Time (years)")+
+  scale_y_continuous("Survival probability")+
+  theme(strip.text.x=element_text(size=16, colour="black", angle=0),
+        strip.background=element_rect(fill="#A6DDCE", colour="black", size=1),
+        axis.text.y=element_text(size=16,color="black"),
+        axis.text.x=element_text(size=16,color="black"),
+        axis.title=element_text(size=16,face="bold",color="black"),
+        legend.text=element_text(size=16, face="bold"),
+        legend.title=element_text(size=16, face="bold"),
+        legend.position="top",
+        axis.line=element_line(color="black",size=0.1, linetype="solid"))
+
+#---
+## Cumulative events (overall)
+
+# version 1
+ggsurvplot(survfit(cox_model_tertiles, data = risk_df),
+           palette= "#40B696",
+           risk.table= TRUE,
+           pval= TRUE,
+           conf.int= TRUE,
+           ggtheme= theme_Gaia(),
+           xlab="Time",
+           ylab="Cumulative event probability",
+           fun="event")
+
+# version 2
+survfit2(cox_model_tertiles) %>%
+  ggsurvfit(color="#40B696",type="risk") +
+  labs(x = "Time", y = "Cumulative event probability") +
+  add_confidence_interval(fill = "#40B696") +
+  add_risktable()+
+  theme_Gaia()
+
+#---
+## Cumulative hazards (overall)
+
+# version 1
+ggsurvplot(survfit(cox_model_tertiles, data = risk_df),
+           palette= "#40B696",
+           risk.table= TRUE,
+           pval= TRUE,
+           conf.int= TRUE,
+           ggtheme= theme_Gaia(),
+           xlab="Time",
+           ylab="Cumulative hazard",
+           fun="cumhaz")
+
+# version 2
+survfit2(cox_model_tertiles) %>%
+  ggsurvfit(color="#40B696",type="cumhaz") +
+  labs(x = "Time", y = "Cumulative hazard") +
+  add_confidence_interval(fill = "#40B696") +
+  add_risktable()+
+  theme_Gaia()
+
+#---
+## Survival by risk tertile group
 
 # KM curve by predicted risk tertile
 km_fit<-survfit(Surv(time, status) ~ risk_group, data=risk_df)
 
-# Plot
+# version 1
 survminer::ggsurvplot(km_fit,
-  data=risk_df,
-  risk.table=TRUE,
-  pval=TRUE,
-  conf.int=TRUE,
-  palette=c("#40B696", "#F1CB0E", "red"),
-  legend.title="Predicted Risk Group",
-  legend.labs=c("Low", "Medium", "High"),
-  xlab="Time",
-  ylab="Survival probability")
+                      data=risk_df,
+                      risk.table=TRUE,
+                      pval=TRUE,
+                      palette=c("#40B696", "#F1CB0E", "red"),
+                      legend.title="Predicted risk group",
+                      legend.labs=c("Low", "Medium", "High"),
+                      xlab="Time",
+                      ylab="Survival Probability")
 
-# plot - version 2
+# version 2
+
 ggplot(risk_df, aes(time=time, status=status, fill=risk_group, color=risk_group)) + geom_km() + geom_kmband() + theme_bw()+
   scale_x_continuous("Time (years)")+
   scale_y_continuous("Survival probability")+
@@ -770,7 +1152,7 @@ ggplot(risk_df, aes(time=time, status=status, fill=risk_group, color=risk_group)
         legend.position="top",
         axis.line=element_line(color="black",size=0.1, linetype="solid"))
 
-# plot - version 3
+# version 3
 ggplot(risk_df, aes(time=time, status=status, fill=risk_group, color=risk_group)) + geom_km() + theme_bw()+
   scale_x_continuous("Time (years)")+
   scale_y_continuous("Survival probability")+
@@ -785,6 +1167,58 @@ ggplot(risk_df, aes(time=time, status=status, fill=risk_group, color=risk_group)
         legend.title=element_text(size=16, face="bold"),
         legend.position="top",
         axis.line=element_line(color="black",size=0.1, linetype="solid"))
+
+#---
+## Cumulative events by risk tertile group
+
+# version 1
+ggsurvplot(km_fit,
+           ggtheme=theme_Gaia(),
+           data=risk_df,
+           risk.table=TRUE,
+           pval=TRUE,
+           conf.int=TRUE,
+           palette=c("#40B696","#F1CB0E","red"),
+           legend.labs=c("Low", "Medium","High"),
+           xlab="Time",
+           ylab="Cumulative event probability",
+           fun="event")
+
+# version 2
+survfit2(Surv(time, status) ~ risk_group,data=risk_df) %>%
+  ggsurvfit(aes(color=risk_group,fill=risk_group),type="risk") +
+  labs(x = "Time", y = "Cumulative event probability") +
+  add_confidence_interval() +
+  add_risktable()+
+  scale_fill_manual("",values=c(Low="#40B696", Medium="#F1CB0E", High="red"))+
+  scale_color_manual("",values=c(Low="#40B696", Medium="#F1CB0E", High="red"))+
+  theme_Gaia()
+
+#---
+## Cumulative hazard by risk tertile group
+
+# version 1
+ggsurvplot(km_fit,
+           ggtheme=theme_Gaia(),
+           data=risk_df,
+           risk.table=TRUE,
+           pval=TRUE,
+           conf.int=TRUE,
+           palette=c("#40B696","#F1CB0E","red"),
+           legend.labs=c("Low", "Medium","High"),
+           xlab="Time",
+           ylab="Cumulative hazard",
+           fun="cumhaz")
+
+# version 2
+survfit2(Surv(time, status) ~ risk_group,data=risk_df) %>%
+  ggsurvfit(aes(color=risk_group,fill=risk_group),type="cumhaz") +
+  labs(x = "Time", y = "Cumulative hazard") +
+  add_confidence_interval() +
+  add_risktable()+
+  scale_fill_manual("",values=c(Low="#40B696", Medium="#F1CB0E", High="red"))+
+  scale_color_manual("",values=c(Low="#40B696", Medium="#F1CB0E", High="red"))+
+  theme_Gaia()
 
 #----------------------------------------------------------------
 #### Feature importance ####
@@ -932,20 +1366,19 @@ test_tmp<-test %>% mutate(impact=direction) %>%
 test_tmp<-test_tmp %>% arrange(desc(mean_value)) %>% filter(mean_value!=0) %>% filter(!is.na(mean_value))
 
 dir_long<-direction_impact %>%
-  dplyr::select(feature, conventional, gam, pairwise,consensus) %>%
-  tidyr::pivot_longer(-feature, names_to="method", values_to="direction") %>%
-  mutate(direction=factor(direction,levels = c("promoting","neutral","mitigating","undefined")),
+  select(feature,conventional,gam,pairwise,consensus) %>%
+  pivot_longer(-feature, names_to="method", values_to="direction") %>%
+  mutate(direction=factor(direction,levels=c("promoting","neutral","mitigating","undefined","uncertain")),
          method=factor(method,
-                       levels = c("conventional","gam","pairwise","consensus"),
-                       labels = c("Conventional\n(mean sign)",
-                                  "Approach 1\n(GAM derivative)",
-                                  "Approach 2\n(pairwise bins)",
-                                  "Approach 3\n(consensus)")))
+                       levels=c("conventional","gam","pairwise","consensus"),
+                       labels=c("Conventional\n(mean sign)","GAM derivative","Pairwise bins","Consensus")))
 
-plot0<-ggplot(dir_long, aes(x=method, y=feature, fill=direction)) +
-  geom_tile(color="white", linewidth=0.8) +
-  scale_fill_manual(values = c("promoting"="#A6DDCE","neutral"="#f7f7f7","mitigating"="#F9CBC2","undefined"="grey80"),na.value="grey80") +
-  labs(title="", x = "", y = "Feature", fill = "Direction") +
+plot0<-ggplot(dir_long,aes(x=method,y=feature,fill=direction))+
+  geom_tile(color="black")+
+  scale_fill_manual("Direction:",values=c("promoting"="#F9CBC2","neutral"="#f7f7f7","uncertain"="grey25",
+                                          "mitigating"="#A6DDCE","undefined"="grey75"),na.value="grey80")+
+  scale_x_discrete("",expand=c(0,0))+
+  scale_y_discrete("",expand=c(0,0))+
   theme_Gaia()+
   theme(legend.position="top")
 
@@ -961,7 +1394,9 @@ ordre_def2<-test_tmp %>% filter(mean_value<0) %>% arrange(desc(IC_97.5))
 ordre_def<-bind_rows(ordre_def1,ordre_def2)
 
 test_tmp$feature<-factor(test_tmp$feature,levels=rev(unique(ordre_def$feature)))
-test_tmp$impact<-factor(test_tmp$impact,levels=c("mitigating","neutral","promoting"),labels=c("mitigating predictor","no impact","promoting predictor"))
+test_tmp$impact<-factor(test_tmp$impact,
+                        levels=c("mitigating","neutral","promoting","uncertain","undefined"),
+                        labels=c("mitigating predictor","neutral","promoting predictor","uncertain","undefined"))
 
 # Plot 1: error bar
 plot1<-ggplot(test_tmp,aes(y=feature,x=mean_value,col=impact))+
@@ -971,7 +1406,9 @@ plot1<-ggplot(test_tmp,aes(y=feature,x=mean_value,col=impact))+
   geom_text(aes(x=IC_97.5,y=feature,label=abs(IC_97.5)),size=5,position=position_nudge(x=if_else(test_tmp$IC_97.5>=0,0.15,-0.15)))+
   scale_y_discrete("")+
   theme_Gaia()+
-  scale_color_manual("Direction:",na.value="white",values=rev(c("neutral"="black","promoting predictor"="#C35C33","mitigating predictor"="#40B696")))+
+  scale_color_manual("Direction:",na.value="white",
+                     values=rev(c("neutral"="grey80","promoting predictor"="#C35C33","mitigating predictor"="#40B696",
+                                  "uncertain"="black","undefined"="grey50")))+
   theme(legend.position="bottom")
 
 # Exporting plot 1
@@ -987,7 +1424,8 @@ plot2<-ggplot(test_tmp,aes(y=feature,x=mean_value,fill=impact))+
   scale_x_continuous("mean |SHAP value|",label=function(x) abs(x))+
   scale_y_discrete("")+
   theme_Gaia()+
-  scale_fill_manual("Direction:",na.value="white",values=c("mitigating predictor"="#A6DDCE","promoting predictor"="#F9CBC2","neutral"="white"))+
+  scale_fill_manual("Direction:",na.value="white",
+                    values=c("mitigating predictor"="#A6DDCE","promoting predictor"="#F9CBC2","neutral"="white","uncertain"="grey","undefined"="grey50"))+
   theme(legend.position="bottom")
 
 # Exporting plot 2
@@ -1002,13 +1440,14 @@ test_tmp$feature<-factor(test_tmp$feature, levels=rev(unique(ordre_def2$feature)
 
 plot3<-ggplot(test_tmp, aes(y=feature, x=SHAP_per, fill=impact))+
   geom_bar(stat="identity", col="black")+
-  geom_text(aes(x=SHAP_per, y=feature, label=paste0(signif(abs(SHAP_per),3),"%")), size=6,
+  geom_text(aes(x=SHAP_per, y=feature, label=paste0(signif(abs(SHAP_per),3))), size=6,
             position=position_nudge(x=if_else(test_tmp$SHAP_per>=0,
                                               round(max(test_tmp$SHAP_per,na.rm=TRUE)/10),
                                               -round(max(test_tmp$SHAP_per,na.rm=TRUE)/10))))+
   scale_x_continuous("Relative contribution to model output (%)", label=function(x) paste0(abs(x)))+
   scale_y_discrete("Feature")+
-  scale_fill_manual("Direction:", na.value="white",values=c("mitigating predictor"="#A6DDCE","promoting predictor"="#F9CBC2","neutral"="white"))+
+  scale_fill_manual("Direction:",na.value="white",
+                    values=c("mitigating predictor"="#A6DDCE","promoting predictor"="#F9CBC2","neutral"="white","uncertain"="grey","undefined"="grey50"))+
   theme_Gaia()+
   theme(legend.position="bottom")
 
@@ -1053,11 +1492,11 @@ zero_feature_values<-pred_grid[zero_indices]
 
 breaks<-c(min(pred_grid), zero_feature_values, max(pred_grid))
 regions<-data.frame(xmin=breaks[-length(breaks)],
-  xmax=breaks[-1],
-  sign=sapply(1:(length(breaks)-1), function(i) {
-    mid_pred<-mean(gam_pred$fit[pred_grid >= breaks[i] & pred_grid <= breaks[i+1]])
-    ifelse(mid_pred > 0, "positive", "negative")
-  }))
+                    xmax=breaks[-1],
+                    sign=sapply(1:(length(breaks)-1), function(i) {
+                      mid_pred<-mean(gam_pred$fit[pred_grid >= breaks[i] & pred_grid <= breaks[i+1]])
+                      ifelse(mid_pred > 0, "positive", "negative")
+                    }))
 
 # Assigning colors depending on SHAP values
 regions$color<-ifelse(regions$sign=="positive", "#F9CBC24C", "#A6DDCE4C")
