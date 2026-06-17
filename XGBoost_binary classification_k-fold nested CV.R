@@ -598,7 +598,9 @@ plot_errorbar<-ggplot(shap_summary, aes(y=feature, x=mean_abs_shap, color=direct
   geom_errorbar(aes(xmin=CI_2.5, xmax=CI_97.5), width=0.2) +
   scale_x_continuous("mean |SHAP value|", labels=function(x) abs(x))+
   geom_text(aes(x=CI_97.5+pos,y=feature,label=label_shap),size=5)+
-  scale_color_manual("Direction:",values=c("promoting"="#C35C33","mitigating"="#40B696","neutral"="black")) +
+  scale_color_manual("Direction:",na.value="white",
+                     values=rev(c("neutral"="grey80","promoting"="#C35C33","mitigating"="#40B696",
+                                  "uncertain"="black","undefined"="grey50")))+
   theme_Gaia() +
   theme(legend.position="bottom")
 
@@ -615,7 +617,8 @@ plot_bar<-ggplot(shap_summary, aes(y=feature, x=mean_abs_shap, fill=direction)) 
   geom_text(aes(x=mean_abs_shap,y=feature,label=label_mean_shap),
             size=6,position=position_nudge(x=if_else(shap_summary$mean_abs_shap>=0,0.2,-0.2)))+
   scale_x_continuous("mean |SHAP value|", labels=function(x) abs(x)) +
-  scale_fill_manual("Direction:",values=c("mitigating"="#A6DDCE","promoting"="#F9CBC2","neutral"="white")) +
+  scale_fill_manual("Direction:",na.value="white",
+                    values=c("mitigating"="#A6DDCE","promoting"="#F9CBC2","neutral"="white","uncertain"="grey","undefined"="grey50"))+
   theme_Gaia() +
   theme(legend.position="bottom")
 
@@ -626,20 +629,19 @@ ggsave(plot_bar, file=paste0("SHAP_barplot_", Sys.Date(), ".pdf"),dpi=600, width
 ## Plot3: SHAP direction comparison
 
 dir_long<-direction_impact %>%
-  dplyr::select(feature, conventional, gam, pairwise,consensus) %>%
-  tidyr::pivot_longer(-feature, names_to="method", values_to="direction") %>%
-  mutate(direction=factor(direction,levels = c("promoting","neutral","mitigating","undefined")),
+  select(feature,conventional,gam,pairwise,consensus) %>%
+  pivot_longer(-feature, names_to="method", values_to="direction") %>%
+  mutate(direction=factor(direction,levels=c("promoting","neutral","mitigating","undefined","uncertain")),
          method=factor(method,
-                       levels = c("conventional","gam","pairwise","consensus"),
-                       labels = c("Conventional\n(mean sign)",
-                                  "Approach 1\n(GAM derivative)",
-                                  "Approach 2\n(pairwise bins)",
-                                  "Approach 3\n(consensus)")))
+                       levels=c("conventional","gam","pairwise","consensus"),
+                       labels=c("Conventional\n(mean sign)","GAM derivative","Pairwise bins","Consensus")))
 
-plot3<-ggplot(dir_long, aes(x=method, y=feature, fill=direction)) +
-  geom_tile(color="white", linewidth=0.8) +
-  scale_fill_manual(values = c("promoting"="#A6DDCE","neutral"="#f7f7f7","mitigating"="#F9CBC2","undefined"="grey80"),na.value="grey80") +
-  labs(title="", x = "", y = "Feature", fill = "Direction") +
+plot3<-ggplot(dir_long,aes(x=method,y=feature,fill=direction))+
+  geom_tile(color="black")+
+  scale_fill_manual("Direction:",values=c("promoting"="#F9CBC2","neutral"="#f7f7f7","uncertain"="grey25",
+                                          "mitigating"="#A6DDCE","undefined"="grey75"),na.value="grey80")+
+  scale_x_discrete("",expand=c(0,0))+
+  scale_y_discrete("",expand=c(0,0))+
   theme_Gaia()+
   theme(legend.position="top")
 
@@ -656,13 +658,14 @@ test_tmp$feature<-factor(test_tmp$feature, levels=rev(unique(ordre_def2$feature)
 
 plot4<-ggplot(test_tmp, aes(y=feature, x=SHAP_per, fill=impact))+
   geom_bar(stat="identity", col="black")+
-  geom_text(aes(x=SHAP_per, y=feature, label=paste0(signif(abs(SHAP_per),3),"%")), size=6,
+  geom_text(aes(x=SHAP_per, y=feature, label=paste0(signif(abs(SHAP_per),3))), size=6,
             position=position_nudge(x=if_else(test_tmp$SHAP_per>=0,
                                               round(max(test_tmp$SHAP_per,na.rm=TRUE)/10),
                                               -round(max(test_tmp$SHAP_per,na.rm=TRUE)/10))))+
   scale_x_continuous("Relative contribution to model output (%)", label=function(x) paste0(abs(x)))+
   scale_y_discrete("Feature")+
-  scale_fill_manual("Direction:", na.value="white",values=c("mitigating predictor"="#A6DDCE","promoting predictor"="#F9CBC2","neutral"="white"))+
+  scale_fill_manual("Direction:",na.value="white",
+                    values=c("mitigating"="#A6DDCE","promoting"="#F9CBC2","neutral"="white","uncertain"="grey","undefined"="grey50"))+
   theme_Gaia()+
   theme(legend.position="bottom")
 
