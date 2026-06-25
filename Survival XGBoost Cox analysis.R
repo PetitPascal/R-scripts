@@ -6,7 +6,7 @@ gctorture(FALSE)
 
 ## Installing and loading packages
 pack_needed<-c("data.table","tidyverse","mllrnrs","mlsurvlrnrs","survival","splitTools","conflicted","mlexperiments","kdry","survminer","timeROC","cluster","pec","ggsurvfit","ggkm",
-               "factoextra","R6","xgboost","mgcv","quantreg","parallel","here","scales","dplyr", "ggplot2", "tidyr", "tibble","mgcv", "gratia", "shapr","iml","devtools", "Rcpp")
+               "factoextra","R6","xgboost","mgcv","quantreg","parallel","here","scales","dplyr", "ggplot2", "tidyr", "tibble","mgcv", "gratia", "shapr","iml","devtools", "Rcpp", "shapviz")
 
 if(!("ggkm"%in%.packages(all.available=TRUE))){
   devtools::install_github("sachsmc/ggkm", force=TRUE)
@@ -112,6 +112,38 @@ theme_Gaia<-function(){
           legend.text=element_text(size=12),
           legend.title=element_text(size=12, face="bold"),
           axis.line=element_line(color="black", linewidth=0.1))
+}
+
+#- - - - - -
+## SHAP interaction summary
+#
+# Goal: to summarize SHAP interaction values
+#
+# Returns:
+# - feature: feature name
+# - interaction_strength: mean absolute off-diagonal SHAP interaction -> high values indicate this feature interacts strongly with others
+# - main_effect_mean: mean absolute diagonal (main effect) SHAP -> to compare interaction vs. main effect magnitude
+
+shap_interaction_summary<-function(xgb_fit, X_mat, feature_cols){
+  inter<-predict(xgb_fit, X_mat, predinteraction = TRUE)
+  p<-length(feature_cols)
+  
+  arr<-if(length(dim(inter))==3){
+    inter
+  }else{
+    array(inter, dim = c(nrow(X_mat), p + 1, p + 1))
+  }
+  
+  dplyr::bind_rows(lapply(seq_len(p), function(j){
+    off<-arr[, j, 1:p, drop = FALSE]
+    if(length(dim(off))==3) off<-off[, 1, , drop = FALSE]
+    main<-arr[, j, j]
+    offdiag<-rowSums(abs(off), na.rm = TRUE) - abs(main)
+    
+    data.frame(feature=feature_cols[j],
+               interaction_strength=mean(offdiag, na.rm = TRUE),
+               main_effect_mean=mean(main, na.rm = TRUE))
+  }))
 }
 
 #- - - - - -
@@ -1340,7 +1372,6 @@ test3<-Shap_val %>% arrange(desc(as.numeric(mean_value)))
 ## SHAP directionality summary
 
 direction_impact<-compute_shap_directions_long(tempopo,threshold = 0.55, n_bins = 200) %>% select(-c(n,mean_shap,median_shap)) %>%
-  filter(feature %ni% c("(Intercept)","BIAS","Bias")) %>%
   # Consensus: majority vote across three methods
   mutate(consensus=apply(cbind(conventional,gam, pairwise), 1,
                          function(x){
@@ -1582,6 +1613,39 @@ ggsave(plot4,
        file=paste("SHAP direction comparison_",
                   Sys.Date(),".pdf",sep=""),
        dpi=600,width=60,height=30,units = "cm",limitsize=F)
+
+#--------------------------------------------
+#### SHAP importance plot
+
+sv<-shapviz(final_mod, X_pred=test_x, interactions=TRUE)
+sv_importance(sv,fill="#40B696")+theme_Gaia()
+
+#--------------------------------------------
+#### SHAP interaction
+
+# feature-level average of absolute SHAP interaction magnitude
+shap_interaction_summary(final_mod, test_x, feature_cols)
+
+# global interaction strength for the model
+predictor<-Predictor$new(model=final_mod,
+                         data=data.frame(test_x),
+                         y=test_y,
+                         predict.function=function(model, newdata){
+                           predict(model, xgboost::xgb.DMatrix(as.matrix(newdata)))
+                         })
+
+interact<-Interaction$new(predictor)
+plot(interact)+theme_Gaia()
+
+# pairwise SHAP interaction strengths
+sv_interaction(sv, kind="no")
+
+# SHAP dependence plot
+sv_dependence(sv, v=c("age","sex"), interactions = TRUE)
+
+# SHAP interaction plot
+sv_interaction(sv, kind="bar",fill="#40B696")+theme_Gaia()
+# sv_interaction(sv, kind="beeswarm")+theme_Gaia()
 
 #- - - - - - - - - -
 ## SHAP and Cox comparison
