@@ -7,7 +7,7 @@ gctorture(FALSE)
 ## Installing and loading packages
 pack_needed<-c("data.table","tidyverse","mllrnrs","broom","doParallel","foreach",
                "splitTools","conflicted","grid","gridExtra","RColorBrewer","mlbench",
-               "mlexperiments","caret","MLmetrics","patchwork","scales",
+               "mlexperiments","caret","MLmetrics","patchwork","scales", "shapviz",
                "xgboost","parallel","here","dplyr", "ggplot2", "tidyr", "tibble","mgcv", "gratia", "shapr","iml", "Rcpp","pROC")
 
 is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
@@ -128,6 +128,38 @@ theme_Gaia<-function(){
           legend.text=element_text(size=12),
           legend.title=element_text(size=12, face="bold"),
           axis.line=element_line(color="black", linewidth=0.1))
+}
+
+#- - - - - -
+## SHAP interaction summary
+#
+# Goal: to summarize SHAP interaction values
+#
+# Returns:
+# - feature: feature name
+# - interaction_strength: mean absolute off-diagonal SHAP interaction -> high values indicate this feature interacts strongly with others
+# - main_effect_mean: mean absolute diagonal (main effect) SHAP -> to compare interaction vs. main effect magnitude
+
+shap_interaction_summary<-function(xgb_fit, X_mat, feature_cols){
+  inter<-predict(xgb_fit, X_mat, predinteraction = TRUE)
+  p<-length(feature_cols)
+  
+  arr<-if(length(dim(inter))==3){
+    inter
+  }else{
+    array(inter, dim = c(nrow(X_mat), p + 1, p + 1))
+  }
+  
+  dplyr::bind_rows(lapply(seq_len(p), function(j){
+    off<-arr[, j, 1:p, drop = FALSE]
+    if(length(dim(off))==3) off<-off[, 1, , drop = FALSE]
+    main<-arr[, j, j]
+    offdiag<-rowSums(abs(off), na.rm = TRUE) - abs(main)
+    
+    data.frame(feature=feature_cols[j],
+               interaction_strength=mean(offdiag, na.rm = TRUE),
+               main_effect_mean=mean(main, na.rm = TRUE))
+  }))
 }
 
 #- - - - - -
@@ -551,13 +583,13 @@ shap_summary<-shap_all %>%
     CI_97.5=quantile(abs(shap_value), 0.975, na.rm=TRUE),
     mean_shap_signed=mean(shap_value, na.rm=TRUE),
     .groups="drop") %>%
-  arrange(desc(mean_abs_shap)) %>%
-  filter(feature %ni% c("(Intercept)","BIAS","Bias"))
+  arrange(desc(mean_abs_shap)) # %>%
+  # filter(feature %ni% c("(Intercept)","BIAS","Bias"))
 
 #- - - - - - - - - -
 ## Computing SHAP directionality
 direction_impact<-compute_shap_directions_long(shap_long,threshold = 0.55, n_bins = 200) %>% select(-c(n,mean_shap,median_shap)) %>%
-                  filter(feature %ni% c("(Intercept)","BIAS","Bias")) %>%
+                  # filter(feature %ni% c("(Intercept)","BIAS","Bias")) %>%
   # Consensus: majority vote across three methods
   mutate(consensus=apply(cbind(conventional,gam, pairwise), 1,
                          function(x){
