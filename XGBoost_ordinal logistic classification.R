@@ -6,35 +6,15 @@ gctorture(FALSE)
 
 ## Installing packages if needed
 pack_needed<-c("data.table","tidyverse","mllrnrs","broom","doParallel","foreach",
-               "splitTools","conflicted","grid","gridExtra","RColorBrewer","mlbench",
+               "splitTools","conflicted","grid","gridExtra","RColorBrewer","mlbench","shapviz",
                "mlexperiments","caret","MLmetrics","patchwork","yardstick","pROC","ordinal","performance",
                "xgboost","parallel","here","irr")
-for (i in 1:length(pack_needed)){
-  if(pack_needed[i]%in%.packages(all.available=TRUE)){
-  }else{
-    install.packages(pack_needed[i])
-  }
-}
 
-## Package loading
-library(tidyverse)
-library(data.table)
-library(broom)
-library(doParallel)
-library(foreach)
-library(pROC)
-library(grid)
-library(gridExtra)
-library(conflicted)
-library(RColorBrewer)
-library(mlexperiments)
-library(mllrnrs)
-library(mlbench)
-library(caret)
-library(MLmetrics)
-library(xgboost)
-library(patchwork)
-library(here)
+is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed==FALSE)){
+  install.packages(pack_needed[!is_installed],repos="http://cran.us.r-project.org")
+}
+invisible(lapply(pack_needed, library, character.only=TRUE))
 
 ## Preventing package conflicts
 conflict_prefer("select", "dplyr") 
@@ -329,6 +309,38 @@ compute_shap_directions_long<-function(long_df,threshold,n_bins){
 #- - - - - -
 ## not-in operator
 `%ni%`<-Negate('%in%')
+
+#- - - - - -
+## SHAP interaction summary
+#
+# Goal: to summarize SHAP interaction values
+#
+# Returns:
+# - feature: feature name
+# - interaction_strength: mean absolute off-diagonal SHAP interaction -> high values indicate this feature interacts strongly with others
+# - main_effect_mean: mean absolute diagonal (main effect) SHAP -> to compare interaction vs. main effect magnitude
+
+shap_interaction_summary<-function(xgb_fit, X_mat, feature_cols){
+  inter<-predict(xgb_fit, X_mat, predinteraction = TRUE)
+  p<-length(feature_cols)
+  
+  arr<-if(length(dim(inter))==3){
+    inter
+  }else{
+    array(inter, dim = c(nrow(X_mat), p + 1, p + 1))
+  }
+  
+  dplyr::bind_rows(lapply(seq_len(p), function(j){
+    off<-arr[, j, 1:p, drop = FALSE]
+    if(length(dim(off))==3) off<-off[, 1, , drop = FALSE]
+    main<-arr[, j, j]
+    offdiag<-rowSums(abs(off), na.rm = TRUE) - abs(main)
+    
+    data.frame(feature=feature_cols[j],
+               interaction_strength=mean(offdiag, na.rm = TRUE),
+               main_effect_mean=mean(main, na.rm = TRUE))
+  }))
+}
 
 #----------------------------------------------------------------
 #### Data import and preprocessing ####
@@ -709,7 +721,6 @@ test3<-Shap_val %>% arrange(desc(as.numeric(mean_val)))
 #- - - - - - - - - -
 ## SHAP directionality
 direction_impact<-compute_shap_directions_long(tempopo,threshold=0.55, n_bins=200) %>% select(-c(n,mean_shap,median_shap)) %>%
-  filter(feature %ni% c("(Intercept)","BIAS","Bias")) %>%
   # Consensus: majority vote across three methods
   mutate(consensus=apply(cbind(conventional,gam, pairwise), 1,
                          function(x){
@@ -1000,7 +1011,6 @@ for(n_clust in 1:num_class){
   ## SHAP directionality
 
   direction_impact<-compute_shap_directions_long(tempopo,threshold=0.55, n_bins=200) %>% select(-c(n,mean_shap,median_shap)) %>%
-    filter(feature %ni% c("(Intercept)","BIAS","Bias")) %>%
     # Consensus: majority vote across three methods
     mutate(consensus=apply(cbind(conventional,gam, pairwise), 1,
                            function(x){
