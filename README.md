@@ -78,17 +78,9 @@ Performs Bayesian Model Averaging (BMA) for probabilistic model selection in lin
 
 Performs BMA for probabilistic model selection in logistic regression.
 
-•	*SHAP_direction.R*
+•	*Global_SHAP_direction.R*
 
-Script to infer feature direction from SHAP values using three methods:
-
--1) The conventional approach based on the mean SHAP sign.
-
--2) A GAM-based approach using the derivative, with a Spearman correlation fallback.
-
--3) A pairwise bin concordance approach.
-
-An example is provided to demonstrate how to use each method and compare their outputs.
+This script goal is to determine, in a reproducible and generalizable way, the global model-based directional pattern (promoting, mitigating, non-monotonic, neutral, or uncertain) of a feature’s relationship with a model’s predictions, based on SHAP or ALE (Accumulated Local Effects) values. This directional summary is intended as an exploratory hypothesis-generation tool, specifically to help identify which features within a large exposure set behave as plausible promoting or mitigating factors and merit further investigation, rather than as a tool for causal or confirmatory inference. A multi-approach framework for determining the global directional pattern of features in machine learning models is proposed. This framework combines several complementary statistical approaches (rank-based concordance, robust slope estimation, area-weighted integration, and others) into a shape-aware consensus, along with diagnostics to flag features for which a single directional label would be misleading. An example is provided to demonstrate how to use each method and compare their outputs. This also includes a bootstrap-based and a model-refit-based stability check.
 
 •	*BKMR.R*
 
