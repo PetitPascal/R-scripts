@@ -1,5 +1,5 @@
 #-------------------------------------------------------------------------------
-## Reproducible & generalisable clustering analysis script
+## Reproducible and generalisable clustering analysis script
 # Covers:
 #   - Data simulation and preprocessing
 #   - Optimal cluster number: elbow, silhouette, gap statistic, NbClust
@@ -11,6 +11,8 @@
 #   - FlexMix (mixture of regression models)
 #   - DBSCAN (density-based)
 #   - Spectral clustering
+#   - Latent class analysis (LCA)
+#   - Gaussian mixture with full within-class covariance
 #   - UMAP (dimensionality reduction + cluster overlay)
 #   - t-SNE (for comparison)
 #   - Cluster validation and characterization
@@ -18,79 +20,80 @@
 #-------------------------------------------------------------------------------
 
 #--------------------------------------------
-## Step 1: Setup
-rm(list = ls())
+### Step 1: Setup
+
+rm(list=ls())
 set.seed(123)
 
-required_pkgs<-c("MASS", "dplyr", "tidyr", "ggplot2", "factoextra","cluster", "NbClust", "mclust", "flexmix",
-                   "dbscan", "kernlab", "umap", "Rtsne","fclust", "e1071", "pheatmap", "RColorBrewer","ggrepel", "patchwork", "tibble", "corrplot")
+required_pkgs<-c("MASS", "dplyr", "tidyr", "ggplot2", "factoextra", "cluster", "NbClust", "mclust", "flexmix", "poLCA", "tidySEM", "lcmm",
+                 "dbscan", "kernlab", "umap", "Rtsne","fclust", "e1071", "pheatmap", "RColorBrewer","ggrepel", "patchwork", "tibble", "corrplot")
 
 is_installed<-required_pkgs %in% rownames(installed.packages(all.available=TRUE))
-if(any(is_installed == FALSE)){
-  install.packages(required_pkgs[!is_installed],repos = "http://cran.us.r-project.org")
+if(any(is_installed==FALSE)){
+  install.packages(required_pkgs[!is_installed],repos="http://cran.us.r-project.org")
 }
-invisible(lapply(required_pkgs, library, character.only = TRUE))
+invisible(lapply(required_pkgs, library, character.only=TRUE))
 
 #--------------------------------------------
-## Step 2: Simulating multi-cluster dataset
+### Step 2: Simulating multi-cluster dataset
 
-# 4 well-separated clusters in 8-dimensional space (mimics an omics / environmental mixture dataset)
+# Creating 4 separated clusters in 8-dimensional space to mimic an omics or environmental mixture dataset
 n_per<-120
 K_true<-4
 
 centres<-list(c(0,0,1,1,-1,-1,0,0),
-  c(3,3,0,0,1,1,2,2),
-  c(-3,2,2,-2,0,1,-1,1),
-  c(1,-3,-1,2,2,-1,1,-2))
+              c(3,3,0,0,1,1,2,2),
+              c(-3,2,2,-2,0,1,-1,1),
+              c(1,-3,-1,2,2,-1,1,-2))
 
 sim_list<-lapply(seq_len(K_true), function(k){
-  X <- MASS::mvrnorm(n_per, mu = centres[[k]],Sigma = diag(0.8, 8) + matrix(0.1, 8, 8))
+  X<-MASS::mvrnorm(n_per, mu=centres[[k]],Sigma=diag(0.8, 8) + matrix(0.1, 8, 8))
   as.data.frame(X)
 })
 
 sim_df<-do.call(rbind, sim_list)
 colnames(sim_df)<-paste0("V", seq_len(8))
-true_labels<-rep(seq_len(K_true), each = n_per)
+true_labels<-rep(seq_len(K_true), each=n_per)
 sim_df$true_k<-factor(true_labels)
 
-# Scale features (essential for most clustering methods)
+# Scaling features (essential for most clustering methods)
 X_scaled<-scale(sim_df[, paste0("V", 1:8)])
 
 #--------------------------------------------
-## Step 3: EDA
+### Step 3: EDA
 
 # Correlation matrix of features
-corrplot::corrplot(cor(X_scaled), method = "color",title = "", mar = c(0,0,1,0))
+corrplot::corrplot(cor(X_scaled), method="color",title="", mar=c(0,0,1,0))
 
 # PCA overview
-pca_res<-prcomp(X_scaled, scale. = FALSE)
+pca_res<-prcomp(X_scaled, scale.=FALSE)
 pca_df<-as.data.frame(pca_res$x[, 1:2])
 pca_df$true_k<-sim_df$true_k
 
-ggplot(pca_df, aes(x = PC1, y = PC2, color = true_k)) +
-  geom_point(alpha = 0.6, size = 2) +
-  labs(title = "PCA: true cluster structure",
-       color = "True cluster") +
-  theme_bw(base_size = 14)
+ggplot(pca_df, aes(x=PC1, y=PC2, color=true_k)) +
+  geom_point(alpha=0.6, size=2) +
+  labs(title="PCA: true cluster structure",
+       color="True cluster") +
+  theme_bw(base_size=14)
 
 #--------------------------------------------
-## Determining the optimal number of clusters
+### Determining the optimal number of clusters
 
 # Approach 1 - elbow method (within-cluster sum of squares)
-factoextra::fviz_nbclust(X_scaled, FUNcluster = kmeans,method = "wss", k.max = 10) +
-  labs(title = "Elbow method: WSS by K") +
+factoextra::fviz_nbclust(X_scaled, FUNcluster=kmeans,method="wss", k.max=10) +
+  labs(title="Elbow method: WSS by K") +
   theme_bw()
 
 # Approach 2 - average silhouette width
-factoextra::fviz_nbclust(X_scaled, FUNcluster = kmeans,method = "silhouette", k.max = 10) +
-  labs(title = "Silhouette method") +
+factoextra::fviz_nbclust(X_scaled, FUNcluster=kmeans,method="silhouette", k.max=10) +
+  labs(title="Silhouette method") +
   theme_bw()
 
 # Approach 3 - gap statistic
 set.seed(123)
-gap_stat<-cluster::clusGap(X_scaled, FUN = kmeans,nstart = 25, K.max = 10, B = 50)
+gap_stat<-cluster::clusGap(X_scaled, FUN=kmeans,nstart=25, K.max=10, B=50)
 factoextra::fviz_gap_stat(gap_stat) +
-  labs(title = "Gap statistic") +
+  labs(title="Gap statistic") +
   theme_bw()
 
 cat("Gap statistic optimal K:", cluster::maxSE(gap_stat$Tab[,"gap"],gap_stat$Tab[,"SE.sim"],method="Tibs2001SEmax"), "\n")
@@ -98,38 +101,39 @@ cat("Gap statistic optimal K:", cluster::maxSE(gap_stat$Tab[,"gap"],gap_stat$Tab
 # Approach 4 -  NbClust: uses majority vote across many indices
 
 nb_res<-NbClust::NbClust(data= X_scaled,
-  distance="euclidean",
-  min.nc=2, max.nc = 8,
-  method="kmeans",
-  index="alllong")
+                         distance="euclidean",
+                         min.nc=2,
+                         max.nc=8,
+                         method="kmeans",
+                         index="alllong")
 
 cat("\nNbClust best K (majority vote):",nb_res$Best.nc["Number_clusters", ] %>% table() %>% which.max() %>% names(),"\n")
 
 # Approach 5 -  BIC via mclust (for model-based)
-mclust_bic<-mclust::mclustBIC(X_scaled, G = 1:10)
-plot(mclust_bic, main = "mclust BIC by K and model")
+mclust_bic<-mclust::mclustBIC(X_scaled, G=1:10)
+plot(mclust_bic, main="mclust BIC by K and model")
 cat("mclust BIC-optimal G:", substr(names(summary(mclust_bic))[1],5,5), "\n")
 
 # Summary table
 sil_vals<-sapply(2:10, function(k){
-  km<-kmeans(X_scaled, centers = k, nstart = 25)
+  km<-kmeans(X_scaled, centers=k, nstart=25)
   s<-cluster::silhouette(km$cluster, dist(X_scaled))
   mean(s[, 3])
 })
 wss_vals<-sapply(2:10, function(k)
-  kmeans(X_scaled, centers = k, nstart = 25)$tot.withinss)
+  kmeans(X_scaled, centers=k, nstart=25)$tot.withinss)
 
-opt_df<-data.frame(K = 2:10, WSS = wss_vals, Silhouette = sil_vals)
+opt_df<-data.frame(K=2:10, WSS=wss_vals, Silhouette=sil_vals)
 cat("\nElbow/Silhouette table\n")
 round(opt_df, 4)
 
 #--------------------------------------------
-## k-means clustering
+### k-means clustering
 
 K_sel<-cluster::maxSE(gap_stat$Tab[,"gap"],gap_stat$Tab[,"SE.sim"],method="Tibs2001SEmax")   # set based on optimal K selection above
 
 set.seed(123)
-km_fit <- kmeans(X_scaled, centers = K_sel, nstart = 50, iter.max = 300)
+km_fit<-kmeans(X_scaled, centers=K_sel, nstart=50, iter.max=300)
 
 cat("K-means cluster sizes:\n")
 table(km_fit$cluster)
@@ -137,63 +141,63 @@ cat("Total WSS:", round(km_fit$tot.withinss, 2), "\n")
 cat("Between/Total SS ratio:", round(km_fit$betweenss/km_fit$totss, 4), "\n")
 
 # Silhouette
-km_sil <- cluster::silhouette(km_fit$cluster, dist(X_scaled))
+km_sil<-cluster::silhouette(km_fit$cluster, dist(X_scaled))
 cat("Average silhouette width:", round(mean(km_sil[,3]), 4), "\n")
-fviz_silhouette(km_sil) + theme_bw() + labs(title = "K-means: silhouette plot")
+fviz_silhouette(km_sil) + theme_bw() + labs(title="K-means: silhouette plot")
 
 # Cluster plot (PCA space)
-fviz_cluster(km_fit, data = X_scaled,
-             palette = "jco", ellipse.type = "convex",
-             repel = TRUE, ggtheme = theme_bw()) +
-  labs(title = "K-means cluster plot (PCA space)")
+fviz_cluster(km_fit, data=X_scaled,
+             palette="jco", ellipse.type="convex",
+             repel=TRUE, ggtheme=theme_bw()) +
+  labs(title="K-means cluster plot (PCA space)")
 
 # Agreement with true labels
-km_ari <- mclust::adjustedRandIndex(km_fit$cluster, true_labels)
+km_ari<-mclust::adjustedRandIndex(km_fit$cluster, true_labels)
 cat("K-means Adjusted Rand Index (ARI) vs. true labels:", round(km_ari, 4), "\n")
 
 #--------------------------------------------
-## Hierachical clustering
+### Hierachical clustering
 
-dist_mat<-dist(X_scaled, method = "euclidean")
+dist_mat<-dist(X_scaled, method="euclidean")
 
 # 1- Agglomerative (Ward.D2)
-hclust_ward<-hclust(dist_mat, method = "ward.D2")
+hclust_ward<-hclust(dist_mat, method="ward.D2")
 
 # Dendrogram
-fviz_dend(hclust_ward, k = K_sel,
-          cex = 0.4, palette = "jco",
-          rect = TRUE, rect_fill = TRUE,
-          main = "Hierarchical (Ward.D2): dendrogram") +
+fviz_dend(hclust_ward, k=K_sel,
+          cex=0.4, palette="jco",
+          rect=TRUE, rect_fill=TRUE,
+          main="Hierarchical (Ward.D2): dendrogram") +
   theme_bw()
 
-hc_labels<-cutree(hclust_ward, k = K_sel)
+hc_labels<-cutree(hclust_ward, k=K_sel)
 hc_sil<-cluster::silhouette(hc_labels, dist_mat)
 cat("Hierarchical (Ward.D2) average silhouette:",round(mean(hc_sil[,3]), 4), "\n")
 cat("Adjusted Rand Index (ARI) vs. true labels:",round(mclust::adjustedRandIndex(hc_labels, true_labels), 4), "\n")
 
 # 2 - Comparing linkage methods
 linkages<-c("ward.D2","complete","average","single")
-link_sil<-sapply(linkages, function(l) {
-  hc<-hclust(dist_mat, method = l)
-  lab<-cutree(hc, k = K_sel)
+link_sil<-sapply(linkages, function(l){
+  hc<-hclust(dist_mat, method=l)
+  lab<-cutree(hc, k=K_sel)
   mean(cluster::silhouette(lab, dist_mat)[, 3])
 })
 
 cat("\nSilhouette by linkage\n")
-round(sort(link_sil, decreasing = TRUE), 4)
+round(sort(link_sil, decreasing=TRUE), 4)
 
 # 3 - Divisive clustering (DIANA)
-diana_fit<-cluster::diana(X_scaled, metric = "euclidean")
-diana_lab<-cutree(as.hclust(diana_fit), k = K_sel)
+diana_fit<-cluster::diana(X_scaled, metric="euclidean")
+diana_lab<-cutree(as.hclust(diana_fit), k=K_sel)
 cat("DIANA average silhouette:",round(mean(cluster::silhouette(diana_lab, dist_mat)[,3]), 4), "\n")
 
 #--------------------------------------------
-## Soft / fuzzy clustering
+### Soft / fuzzy clustering
 
 # fuzzy C-means
-fcm_fit <- e1071::cmeans(X_scaled, centers = K_sel,
-                         iter.max = 200, m = 2, # m=2 is standard fuzziness
-                         method = "cmeans")
+fcm_fit<-e1071::cmeans(X_scaled, centers=K_sel,
+                         iter.max=200, m=2, # m=2 is standard fuzziness
+                         method="cmeans")
 
 cat("Fuzzy C-means cluster sizes (hard assignment):\n")
 table(fcm_fit$cluster)
@@ -203,15 +207,15 @@ cat("\nMembership probabilities (first 6 obs)\n")
 round(head(fcm_fit$membership), 3)
 
 # Distribution of maximum membership probability
-max_memb <- apply(fcm_fit$membership, 1, max)
-hist(max_memb, main = "Fuzzy C-means: max membership probability per observation",
-     xlab = "Max membership", col = "#A6DDCE", breaks = 20)
-abline(v = 0.5, lty = 2, col = "red")
+max_memb<-apply(fcm_fit$membership, 1, max)
+hist(max_memb, main="Fuzzy C-means: max membership probability per observation",
+     xlab="Max membership", col="#A6DDCE", breaks=20)
+abline(v=0.5, lty=2, col="red")
 cat("Observations with max membership < 0.6 (ambiguous):",sum(max_memb < 0.6), "\n")
 
-# Fuzziness index (partition coefficient; 1 = crisp, 1/K = fully fuzzy)
-pc <- sum(fcm_fit$membership^2) / nrow(X_scaled)
-cat("Partition coefficient (PC):", round(pc, 4),"(closer to 1 = crisper clusters)\n")
+# Fuzziness index (partition coefficient; 1=crisp, 1/K=fully fuzzy)
+pc<-sum(fcm_fit$membership^2) / nrow(X_scaled)
+cat("Partition coefficient (PC):", round(pc, 4),"(closer to 1=crisper clusters)\n")
 
 # Hard assignment ARI
 fcm_ari<-mclust::adjustedRandIndex(fcm_fit$cluster, true_labels)
@@ -222,16 +226,16 @@ pca_fcm<-as.data.frame(pca_res$x[, 1:2])
 pca_fcm$hard_cluster<-factor(fcm_fit$cluster)
 pca_fcm$max_memb<-max_memb
 
-ggplot(pca_fcm, aes(x = PC1, y = PC2,color = hard_cluster, size = max_memb)) +
-  geom_point(alpha = 0.6) +
-  scale_size_continuous(range = c(0.5, 4),name = "Max membership") +
-  labs(title = "Fuzzy C-means: PCA plot (size = certainty)", color = "Cluster") +
-  theme_bw(base_size = 14)
+ggplot(pca_fcm, aes(x=PC1, y=PC2,color=hard_cluster, size=max_memb)) +
+  geom_point(alpha=0.6) +
+  scale_size_continuous(range=c(0.5, 4),name="Max membership") +
+  labs(title="Fuzzy C-means: PCA plot (size=certainty)", color="Cluster") +
+  theme_bw(base_size=14)
 
 #--------------------------------------------
-## Model-based clustering
+### Model-based clustering
 
-mclust_fit<-mclust::Mclust(X_scaled, G = K_sel)
+mclust_fit<-mclust::Mclust(X_scaled, G=K_sel)
 
 cat("\nmclust: selected model:", mclust_fit$modelName, "\n")
 cat("BIC:", round(mclust_fit$bic, 2), "\n")
@@ -239,45 +243,45 @@ cat("Cluster sizes:\n"); print(table(mclust_fit$classification))
 cat("Adjusted Rand Index (ARI) vs. true labels:",round(mclust::adjustedRandIndex(mclust_fit$classification, true_labels), 4),"\n")
 
 # Plotting mclust diagnostics
-plot(mclust_fit, what = "BIC",  main = "mclust: BIC by model")
-plot(mclust_fit, what = "classification",main = "mclust: classification (PC space)")
-plot(mclust_fit, what = "uncertainty",main = "mclust: uncertainty")
+plot(mclust_fit, what="BIC",  main="mclust: BIC by model")
+plot(mclust_fit, what="classification",main="mclust: classification (PC space)")
+plot(mclust_fit, what="uncertainty",main="mclust: uncertainty")
 
 # Uncertainty (complement of max posterior probability)
-mclust_uncertainty <- 1 - apply(mclust_fit$z, 1, max)
+mclust_uncertainty<-1 - apply(mclust_fit$z, 1, max)
 cat("Mean uncertainty:", round(mean(mclust_uncertainty), 4), "\n")
-hist(mclust_uncertainty, main = "mclust: classification uncertainty",
-     xlab = "Uncertainty", col = "#A6DDCE", breaks = 20)
+hist(mclust_uncertainty, main="mclust: classification uncertainty",
+     xlab="Uncertainty", col="#A6DDCE", breaks=20)
 
 # Posterior probabilities (first 6 rows)
 cat("\nPosterior probabilities (first 6 obs)\n")
 round(head(mclust_fit$z), 3)
 
 #--------------------------------------------
-## Semi-supervized model-based clustering
+### Semi-supervized model-based clustering
 
 # Scenario: 20% of observations have known labels; rest are unlabelled
 
-known_idx<-sample(seq_len(nrow(X_scaled)),size = round(0.2 * nrow(X_scaled)))
+known_idx<-sample(seq_len(nrow(X_scaled)),size=round(0.2 * nrow(X_scaled)))
 class_labels<-rep(NA, nrow(X_scaled))
 class_labels[known_idx]<-true_labels[known_idx]
 
-ss_fit<-mclust::MclustSSC(X_scaled, class = class_labels, G = K_sel)
+ss_fit<-mclust::MclustSSC(X_scaled, class=class_labels, G=K_sel)
 
 cat("\nSemi-supervised mclust results\n")
 cat("Model:", ss_fit$modelName, "\n")
 cat("Adjusted Rand Index (ARI) vs. true labels:",round(mclust::adjustedRandIndex(ss_fit$classification, true_labels), 4),"\n")
 cat("Compare: unsupervised ARI =",round(mclust::adjustedRandIndex(mclust_fit$classification, true_labels), 4),"\n")
 
-plot(ss_fit, what = "classification",main = "Semi-supervised mclust: classification")
+plot(ss_fit, what="classification",main="Semi-supervised mclust: classification")
 
 #--------------------------------------------
-## Flexmix (mixture of regression / latent class models): fits mixture models where each component 
-## has its own regression. It is useful when clusters differ in predictor-outcome relationships
+### Flexmix (mixture of regression / latent class models): fits mixture models where each component 
+### has its own regression. It is useful when clusters differ in predictor-outcome relationships
 
 # Creating a response variable for illustration
 flex_df<-as.data.frame(X_scaled)
-flex_df$response <- 2 * flex_df$V1 - 1.5 * flex_df$V2 + rnorm(nrow(flex_df), 0, 1) + rep(c(0, 2, -2, 1), each = n_per)
+flex_df$response<-2 * flex_df$V1 - 1.5 * flex_df$V2 + rnorm(nrow(flex_df), 0, 1) + rep(c(0, 2, -2, 1), each=n_per)
 
 # Fitting FlexMix: mixture of linear regressions
 set.seed(123)
@@ -301,32 +305,170 @@ cat("Mean max posterior:", round(mean(apply(flex_post, 1, max)), 4), "\n")
 # BIC-based K selection for FlexMix
 flex_bic<-sapply(2:6, function(k) {
   f<-tryCatch(
-    flexmix::flexmix(response ~ V1 + V2 + V3, data = flex_df, k = k),
-    error = function(e) NULL)
+    flexmix::flexmix(response ~ V1 + V2 + V3, data=flex_df, k=k),
+    error=function(e) NULL)
   if (is.null(f)) return(NA)
   BIC(f)
 })
 cat("\n-FlexMix BIC by K\n")
-data.frame(K = 2:6, BIC = round(flex_bic, 2))
+data.frame(K=2:6, BIC=round(flex_bic, 2))
 
 #--------------------------------------------
-## DBSCAN (density-based; no K required)
+### Latent class analysis (LCA): for categorical/binary indicator variables
+
+# Simulating binary/ordinal indicators for LCA, with 3 true latent classes and 8 binary items
+n_lca<-500
+K_lca<-3
+
+# Simulating item response probabilities per class
+probs_true<-list(matrix(c(0.9,0.1,0.3,0.7,0.5,0.5), nrow = K_lca, byrow = TRUE), # Item 1
+                 matrix(c(0.8,0.2,0.4,0.6,0.5,0.5), nrow = K_lca, byrow = TRUE), # Item 2
+                 matrix(c(0.85,0.15,0.35,0.65,0.5,0.5), nrow = K_lca, byrow = TRUE), # Item 3
+                 matrix(c(0.2,0.8,0.7,0.3,0.5,0.5), nrow = K_lca, byrow = TRUE), # Item 4
+                 matrix(c(0.15,0.85,0.8,0.2,0.5,0.5), nrow = K_lca, byrow = TRUE), # Item 5
+                 matrix(c(0.1,0.9,0.75,0.25,0.5,0.5), nrow = K_lca, byrow = TRUE), # Item 6
+                 matrix(c(0.3,0.7,0.5,0.5,0.9,0.1), nrow = K_lca, byrow = TRUE), # Item 7
+                 matrix(c(0.25,0.75,0.45,0.55,0.85,0.15), nrow = K_lca, byrow = TRUE)) # Item 8
+
+# Drawing latent class memberships
+lca_class<-sample(1:K_lca, n_lca, replace=TRUE, prob=c(0.4,0.35,0.25))
+
+# Draw item responses
+lca_items<-matrix(NA, n_lca, 8)
+for(j in 1:8){
+  for(i in 1:n_lca){
+    k<-lca_class[i]
+    lca_items[i,j]<-sample(1:2, 1, prob=probs_true[[j]][k,])
+  }
+}
+colnames(lca_items)<-paste0("item",1:8)
+lca_df<-as.data.frame(lca_items)
+lca_df$age<-rnorm(n_lca, 50, 10) # covariate for LCA with covariates
+
+#- - - - 
+## LCA without covariates
+
+# LCA model selection (BIC over K=1:5)
+lca_form<-cbind(item1,item2,item3,item4,item5,item6,item7,item8) ~ 1
+
+bic_lca<-sapply(1:5, function(k){
+  fit<-tryCatch(poLCA::poLCA(lca_form, data=lca_df, nclass=k, maxiter=1000, nrep=5, verbose=FALSE), error=function(e) NULL)
+  if(is.null(fit)) return(NA)
+  fit$bic
+})
+
+# LCA BIC by number of classes\n
+data.frame(K=1:5, BIC=round(bic_lca,2))
+
+# BIC-optimal classes
+best_lca_k<-which.min(bic_lca)
+best_lca_k
+
+# Fitting best LCA model
+lca_fit<-poLCA::poLCA(lca_form, data=lca_df,
+                      nclass=best_lca_k,
+                      maxiter=2000, nrep=10,
+                      verbose=FALSE)
+lca_fit
+
+# Item-response probabilities per class
+lca_fit$probs
+
+# Class sizes proportions
+round(lca_fit$P, 4)
+
+# Posterior class probabilities (first 6 observations)
+round(head(lca_fit$posterior), 3)
+
+# Adjusted Rand Index (ARI)
+lca_ari<-mclust::adjustedRandIndex(lca_fit$predclass, lca_class)
+cat("LCA ARI vs. true classes:", round(lca_ari, 4), "\n")
+
+#- - - - 
+## LCA with covariates
+
+# LCA model selection
+lca_form_cov<-cbind(item1,item2,item3,item4,item5,item6,item7,item8) ~ age
+
+lca_cov_fit<-tryCatch(poLCA::poLCA(lca_form_cov, data=lca_df, nclass=best_lca_k, maxiter=2000, nrep=5, verbose=FALSE), 
+                      error=function(e){ message("LCA with covariates failed: ",e$message)
+                        NULL})
+
+if(!is.null(lca_cov_fit)){
+  cat("\nLCA with age covariate\n")
+  cat("BIC (no covariate):", round(lca_fit$bic,2),
+      "| BIC (age):", round(lca_cov_fit$bic,2), "\n")
+  print(lca_cov_fit$coeff)  # logistic regression coefficients for class membership
+}
+
+# Visualizing LCA item profiles
+lca_probs_df<-do.call(rbind, lapply(1:best_lca_k, function(k){
+  do.call(rbind, lapply(1:8, function(j){
+    data.frame(class=paste0("Class ",k),
+               item=paste0("item",j),
+               prob=lca_fit$probs[[j]][k, 2]) # P(item=2|class k)
+  }))
+}))
+
+ggplot(lca_probs_df, aes(x=item, y=prob, fill=class)) +
+  geom_col(position="dodge", color="black") +
+  geom_hline(yintercept=0.5, linetype="dashed", color="grey50") +
+  labs(title="LCA: item-response probabilities per class",
+       x="Item", y="P(item=2 | class)", fill="Class") +
+  theme_bw(base_size=13) +
+  theme(axis.text.x=element_text(angle=45,hjust=1))
+
+#--------------------------------------------
+### Mixture model with within-class dependencies
+
+## Gaussian mixture with full within-class covariance
+
+# Searching over model types, VVV (unconstrained covariance) allows full within-class correlation: each component has its own mean and full covariance
+mclust_full<-mclust::Mclust(X_scaled, G=K_sel, modelNames="VVV") # full covariance per component
+
+if(!is.null(mclust_full)){
+  cat("Model: VVV (full, unconstrained covariance per component)\n")
+  cat("BIC:", round(mclust_full$bic, 2), "\n")
+  cat("ARI:", round(mclust::adjustedRandIndex(mclust_full$classification, true_labels), 4), "\n")
+  
+  # Comparing with diagonal covariance (local independence assumption)
+  mclust_diag<-mclust::Mclust(X_scaled, G=K_sel, modelNames="VVI")
+  cat("BIC (VVI, diagonal):", round(mclust_diag$bic, 2), "\n")
+  cat("BIC difference (VVV-VVI):", round(mclust_full$bic - mclust_diag$bic, 2), "(positive = VVV better)\n")
+  
+  # Within-class correlation matrices
+  cat("\nWithin-class correlation matrices\n")
+  for(k in 1:K_sel){
+    sigma_k<-mclust_full$parameters$variance$sigma[,,k]
+    corr_k<-cov2cor(sigma_k)
+    cat("Class", k, "correlation matrix:\n")
+    print(round(corr_k, 3))
+  }
+}else{
+  cat("VVV model failed: falling back to mclustBIC to find best model\n")
+  bic_all<-mclust::mclustBIC(X_scaled, G=K_sel)
+  best_mod<-summary(bic_all)
+  cat("Best model:", best_mod$modelName, "\n")
+}
+
+#--------------------------------------------
+### DBSCAN (density-based; no K required)
 
 # Advantages: finds arbitrary shapes, handles noise/outliers
 # Key parameters: eps (neighbourhood radius), minPts (min neighbours)
 
 # Estimating eps via k-nearest neighbour distance plot
-dbscan::kNNdistplot(X_scaled, k = 5)
-abline(h = 1.5, lty = 2, col = "red") # adjust based on plot
+dbscan::kNNdistplot(X_scaled, k=5)
+abline(h=1.5, lty=2, col="red") # adjust based on plot
 
-db_fit<-dbscan::dbscan(X_scaled, eps = 1.5, minPts = 8)
+db_fit<-dbscan::dbscan(X_scaled, eps=1.5, minPts=8)
 
-cat("DBSCAN cluster sizes (0 = noise):\n")
+cat("DBSCAN cluster sizes (0=noise):\n")
 table(db_fit$cluster)
 cat("Noise points:", sum(db_fit$cluster == 0), "\n")
 
 # Silhouette (excluding noise)
-non_noise <- db_fit$cluster != 0
+non_noise<-db_fit$cluster != 0
 if(length(unique(db_fit$cluster[non_noise])) > 1){
   db_sil<-cluster::silhouette(db_fit$cluster[non_noise],dist(X_scaled[non_noise, ]))
   cat("DBSCAN average silhouette (non-noise):",round(mean(db_sil[,3]), 4), "\n")
@@ -335,25 +477,25 @@ if(length(unique(db_fit$cluster[non_noise])) > 1){
 # Visualizing
 pca_db<-as.data.frame(pca_res$x[, 1:2])
 pca_db$cluster<-factor(db_fit$cluster)
-ggplot(pca_db, aes(x = PC1, y = PC2, color = cluster)) +
-  geom_point(alpha = 0.6, size = 2) +
-  scale_color_manual(values = c("0"="grey70", setNames(RColorBrewer::brewer.pal(8,"Dark2"),as.character(1:8))[seq_len(max(db_fit$cluster))])) +
-  labs(title = "DBSCAN: cluster assignments (grey = noise)",color = "Cluster") +
-  theme_bw(base_size = 14)
+ggplot(pca_db, aes(x=PC1, y=PC2, color=cluster)) +
+  geom_point(alpha=0.6, size=2) +
+  scale_color_manual(values=c("0"="grey70", setNames(RColorBrewer::brewer.pal(8,"Dark2"),as.character(1:8))[seq_len(max(db_fit$cluster))])) +
+  labs(title="DBSCAN: cluster assignments (grey=noise)",color="Cluster") +
+  theme_bw(base_size=14)
 
 #--------------------------------------------
-## Special clustering: for non-convex clusters; uses graph Laplacian eigen decomposition
+### Special clustering: for non-convex clusters -> uses graph Laplacian eigen decomposition
 
-spec_fit<-kernlab::specc(X_scaled, centers = K_sel)
+spec_fit<-kernlab::specc(X_scaled, centers=K_sel)
 spec_lab<-as.integer(spec_fit)
 
 cat("Spectral cluster sizes:\n"); print(table(spec_lab))
-spec_sil  <- cluster::silhouette(spec_lab, dist_mat)
+spec_sil<-cluster::silhouette(spec_lab, dist_mat)
 cat("Spectral average silhouette:", round(mean(spec_sil[,3]), 4), "\n")
 cat("Adjusted Rand Index (ARI) vs. true labels:",round(mclust::adjustedRandIndex(spec_lab, true_labels), 4), "\n")
 
 #--------------------------------------------
-## UMAP: non-linear dimensionality reduction preserving local structure
+### UMAP: non-linear dimensionality reduction preserving local structure
 # Not a clustering method itself, but used to visualize cluster structure
 
 set.seed(123)
@@ -362,7 +504,7 @@ umap_config$n_neighbors<-15
 umap_config$min_dist<-0.1
 umap_config$n_components<-2
 
-umap_fit<-umap::umap(X_scaled, config = umap_config)
+umap_fit<-umap::umap(X_scaled, config=umap_config)
 umap_df<-as.data.frame(umap_fit$layout)
 colnames(umap_df)<-c("UMAP1","UMAP2")
 umap_df$true_k<-sim_df$true_k
@@ -398,7 +540,7 @@ ggplot(umap_df, aes(x=UMAP1, y=UMAP2,color=factor(fcm_fit$cluster), size=max_mem
   theme_bw(base_size=14)
 
 #--------------------------------------------
-## t-SNE (comparison with UMAP)
+### t-SNE (comparison with UMAP)
 
 set.seed(123)
 tsne_fit<-Rtsne::Rtsne(X_scaled, dims=2, perplexity=30,check_duplicates=FALSE, verbose=FALSE)
@@ -412,45 +554,45 @@ ggplot(tsne_df, aes(x=tSNE1, y=tSNE2, color=true_k)) +
   theme_bw(base_size=14)
 
 #--------------------------------------------
-## Cluster validation and comparison
+### Cluster validation and comparison
 
 # Collecting all hard assignments
 all_labels<-data.frame(true=true_labels,
-  kmeans=km_fit$cluster,
-  hclust=hc_labels,
-  diana=diana_lab,
-  fcm_hard=fcm_fit$cluster,
-  mclust=mclust_fit$classification,
-  mclust_ss=ss_fit$classification,
-  flexmix=flexmix::clusters(flex_fit),
-  spectral=spec_lab)
+                       kmeans=km_fit$cluster,
+                       hclust=hc_labels,
+                       diana=diana_lab,
+                       fcm_hard=fcm_fit$cluster,
+                       mclust=mclust_fit$classification,
+                       mclust_ss=ss_fit$classification,
+                       flexmix=flexmix::clusters(flex_fit),
+                       spectral=spec_lab)
 
 # ARI against true labels
-ari_df <- data.frame(method = names(all_labels)[-1],
-  ARI= sapply(names(all_labels)[-1], function(m)
-    round(mclust::adjustedRandIndex(all_labels[[m]], true_labels), 4)))
+ari_df<-data.frame(method=names(all_labels)[-1],
+                     ARI= sapply(names(all_labels)[-1], function(m)
+                       round(mclust::adjustedRandIndex(all_labels[[m]], true_labels), 4)))
 cat("\nAdjusted Rand Index (ARI) vs. true labels\n")
 ari_df[order(-ari_df$ARI), ]
 
 # Average silhouette widths
-sil_df <- data.frame(method=c("kmeans","hclust","diana","fcm","mclust","spectral"),
-  avg_sil=c(mean(cluster::silhouette(km_fit$cluster,dist_mat)[,3]),
-    mean(cluster::silhouette(hc_labels,dist_mat)[,3]),
-    mean(cluster::silhouette(diana_lab,dist_mat)[,3]),
-    mean(cluster::silhouette(fcm_fit$cluster,dist_mat)[,3]),
-    mean(cluster::silhouette(mclust_fit$classification, dist_mat)[,3]),
-    mean(cluster::silhouette(spec_lab,dist_mat)[,3])))
+sil_df<-data.frame(method=c("kmeans","hclust","diana","fcm","mclust","spectral"),
+                     avg_sil=c(mean(cluster::silhouette(km_fit$cluster,dist_mat)[,3]),
+                               mean(cluster::silhouette(hc_labels,dist_mat)[,3]),
+                               mean(cluster::silhouette(diana_lab,dist_mat)[,3]),
+                               mean(cluster::silhouette(fcm_fit$cluster,dist_mat)[,3]),
+                               mean(cluster::silhouette(mclust_fit$classification, dist_mat)[,3]),
+                               mean(cluster::silhouette(spec_lab,dist_mat)[,3])))
 cat("\nAverage silhouette widths\n")
 round(sil_df[order(-sil_df$avg_sil),"avg_sil" ], 4)
 
-ggplot(sil_df, aes(x = reorder(method, avg_sil), y = avg_sil)) +
-  geom_col(fill = "#A6DDCE", color = "black") +
+ggplot(sil_df, aes(x=reorder(method, avg_sil), y=avg_sil)) +
+  geom_col(fill="#A6DDCE", color="black") +
   coord_flip() +
-  labs(title = "Cluster validation: average silhouette by method",x = "", y = "Average silhouette width") +
-  theme_bw(base_size = 14)
+  labs(title="Cluster validation: average silhouette by method",x="", y="Average silhouette width") +
+  theme_bw(base_size=14)
 
 #--------------------------------------------
-## Cluster characterization
+### Cluster characterization
 
 best_labels<-km_fit$cluster # replace with your best method
 char_df<-as.data.frame(X_scaled)
@@ -476,36 +618,36 @@ means_mat<-char_df %>%
   as.matrix()
 
 pheatmap::pheatmap(t(means_mat),
-                   cluster_cols = TRUE, cluster_rows = TRUE,
-                   main = "Cluster mean profiles",
-                   color = colorRampPalette(
+                   cluster_cols=TRUE, cluster_rows=TRUE,
+                   main="Cluster mean profiles",
+                   color=colorRampPalette(
                      rev(RColorBrewer::brewer.pal(9,"RdBu")))(50))
 
 # ANOVA: is each feature different across clusters?
-anova_res <- sapply(paste0("V",1:8), function(v) {
+anova_res<-sapply(paste0("V",1:8), function(v) {
   summary(aov(as.formula(paste(v,"~ cluster")), data=char_df))[[1]][1,"Pr(>F)"]
 })
 cat("\nNOVA p-values: feature differences across clusters\n")
 sort(anova_res)
 
 #--------------------------------------------
-## Reusable pipeline
+### Reusable pipeline
 
-run_clustering_pipeline<-function(data, K = NULL, K_max = 10, scale_data = TRUE,
-                                    methods = c("kmeans","hclust","mclust","fuzzy"),
-                                    seed = 123){
+run_clustering_pipeline<-function(data, K=NULL, K_max=10, scale_data=TRUE,
+                                  methods=c("kmeans","hclust","mclust","fuzzy"),
+                                  seed=123){
   set.seed(seed)
   X<-if(scale_data) scale(data) else as.matrix(data)
   
   # Determine K if not provided (silhouette)
   if(is.null(K)){
-    sil_v <- sapply(2:K_max, function(k)
+    sil_v<-sapply(2:K_max, function(k)
       mean(cluster::silhouette(kmeans(X, centers=k, nstart=25)$cluster, dist(X))[,3]))
     K<-(2:K_max)[which.max(sil_v)]
-    message("Auto-selected K = ", K, " (max silhouette)")
+    message("Auto-selected K=", K, " (max silhouette)")
   }
   
-  res<-list(K = K)
+  res<-list(K=K)
   d_mat<-dist(X)
   
   if("kmeans"%in% methods){
@@ -538,7 +680,7 @@ run_clustering_pipeline<-function(data, K = NULL, K_max = 10, scale_data = TRUE,
   umap_df<-as.data.frame(umap_r$layout)
   colnames(umap_df)<-c("UMAP1","UMAP2")
   
-  if("kmeans" %in% methods) {
+  if("kmeans" %in% methods){
     umap_df$cluster<-factor(res$kmeans)
     p<-ggplot(umap_df, aes(UMAP1, UMAP2, color=cluster)) +
       geom_point(alpha=0.6) +
