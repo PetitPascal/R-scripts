@@ -204,7 +204,7 @@ Script for visualizing continuous variable distributions with multiple plot type
 
 •	*Clustering.R*
 
-Clustering analysis script covering several clustering approaches (e.g., hierarchical, k-means, fuzzy, model-based, density-based, spectral), as well as graphical representation (e.g., UMAP, t-SNE), and the determination of the optimal number of clusters using several metrics (e.g., elbow, silhouette, gap statistic, NbClust).
+Clustering analysis script covering several clustering approaches (e.g., hierarchical, k-means, fuzzy, model-based, density-based, spectral, latent class, Gaussian mixture), as well as graphical representation (e.g., UMAP, t-SNE), and the determination of the optimal number of clusters using several metrics (e.g., elbow, silhouette, gap statistic, NbClust).
 
 ---
 
