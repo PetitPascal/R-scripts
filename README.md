@@ -277,7 +277,7 @@ These scripts have been developed to support analyses in the following works:
 
 •	Petit P, Nübel J, Walter J, Butter C, Heinze M, Ignatyev J, Haase-Fielitz A, Vuillerme N, Muehlensiepen F. Telemedicine adoption in cardiology: determinants and predictors identified using Bayesian model averaging and machine learning. PLOS Digit Health. 2026;5(4):e0001359. doi: 10.1371/journal.pdig.0001359.
 
-•	Petit P, Vuillerme N, Gehrmann J, Stephan J, Muehlensiepen F, Nübel J, Hahn F, Martens E. Determinants and predictors of telemedicine use among physicians in the German outpatient sector: a secondary analysis of a web-based survey. Submitted.
+•	Petit P, Vuillerme N, Gehrmann J, Stephan J, Mühlensiepen F, Nübel J, Martens E, Hahn F. Telemedicine use among physicians in the German outpatient sector: a secondary analysis of a cardiologist-dominated web-based survey with Bayesian model averaging and exploratory machine learning. Digit Health. 2026;12:2026. doi: 10.1177/20552076261460253.
 
 •	Muehlensiepen F, Petit P, Knitza J, Welcker M, Vuillerme N. Prediction of the acceptance of telemedicine among rheumatic patients. A machine learning powered secondary analysis of German survey data. Rheumatol Int. 2024;44(3):523-534. doi: 10.1007/s00296-023-05518-9.
 
@@ -291,13 +291,21 @@ These scripts have been developed to support analyses in the following works:
 
 •	May S, Darkow R, Knitza J, Boy K, Klemm P, Heinze M, Vuillerme N, Petit P, Steffens-Korbanka P, Kladny H, Hornig J, Aries P, Welcker M, Muehlensiepen F. Digital Transformation of Rheumatology Care in Germany: Cross-Sectional National Survey. J Med Internet Res. 2025;27:e52601. doi: 10.2196/52601.
 
+•	Binder M, Temiz A, Blaskowitz PPVA, Coppers B, Ebner I, Petit P, Vuillerme N, Schlaht V, Knitza J, Liphardt AM, Schett G, Morf H. Impact of personalized coaching on the use of digital health interventions for movement therapy in rheumatology: a randomized controlled trial. Sci Rep. 2026;16(1):19582. doi: 10.1038/s41598-026-59770-7.
+
 •	Grube L, Petit P, Vuillerme N, Nitschke M, Nwosu OB, Knitza J, Krusche M, Seifer AK, Eskofier BM, Schett G, Morf H. Complementary App-based Yoga Home Exercise Therapy for patients with axial Spondyloarthritis: A Usability Study. JMIR Form Res. 2024;8:e57185. doi: 10.2196/57185. 
 
 •	Blaskowitz PPVA et al. Impact of the digital health application ViViRA on spinal mobility, physical function, quality of life and pain perception in spondyloarthritides patients: a randomized controlled trial. Arthritis Res Ther. 2024. 2024;26(1):208. doi: 10.1186/s13075-024-03443-1.
 
+•	Afrin S, Ara R, Saif-Ur-Rahman KM, Petit P, Neeher N, Tanin T, Vuillerme N, Asaduzzaman M. The global landscape of planetary health: A Bibliometric Analysis over the last decade (2015-2024) since emergence. Environ Sustain Indic. 2026;101282. doi: 10.1016/j.indic.2026.101282.
+
+•	Petit P, Vuillerme N. Global research trends on the human exposome: a bibliometric analysis (2005-2024). Environ Sci Pollut Res. 2025;32(13):7808-7833. doi: 10.1007/s11356-025-36197-7.
+
+•	Petit P, Vuillerme N. Leveraging administrative health databases to address health challenges in farming populations: a scoping review and bibliometric analysis (1975-2024). JMIR Public Health Surveill. 2025;11:e62939. doi: 10.2196/62939. 
+
 •	Petit P, Berger F, Bonneterre V, Vuillerme N. Exploring Alzheimer's Disease Risk Factors in Farmers with Explainable Machine Learning and Administrative Health Data. Submitted.
 
-•	Petit P, Berger F, Bonneterre V, Vuillerme N. Leveraging machine learning with real-world data for hypothesis generation by identifying exposomic predictors in Parkinson’s disease among farmers. J Parkinsons Dis. 2026.  Accepted. doi : 10.1177/1877718X261453798.
+•	Petit P, Berger F, Bonneterre V, Vuillerme N. Leveraging machine learning with real-world data for hypothesis generation by identifying exposomic predictors in Parkinson’s disease among farmers. J Parkinsons Dis. 2026;1-17. doi: 10.1177/1877718X261453798.
 
 •	Petit P, Bonneterre V, Vuillerme N. Using Machine Learning and Nationwide Population-based Data to Unravel Predictors of Treated Depression in Farmers. Ment Illn. 2025;2025:17. doi: 10.1155/mij/5570491.
 
@@ -343,6 +351,10 @@ These scripts have been developed to support analyses in the following works:
 
 •	Choueiri J, Petit P, Balducci F, Bicout DJ, Demeilliers C. Literature-based inventory of chemical substance concentrations measured in organic food consumed in Europe. Data. 2024;9(7):89. doi: 10.3390/data9070089.
 
+•	Drevet S, Agbogbo MA, Ghaith A, Chardon M, Guinot M, Coudurier M, Doutreleau S, Lumale S, Musso N, Petit P, Lopez C, Penkov G, El Mouzdahir E, Mouret S, Liuu E, Vuillerme N, Flore P, Gavazzi G. Improvement of frailty and prefrailty in older cancer survivors: a 6-month home-based pilot study. Age Ageing. 2026. Accepted.
+
+•	Bianchini E, Petit P, Rinaldi D, Alborghetti M, Galli S, De Carolis L, Milane T, Chardon M, Suppa A, Marano M, Hansen C, Salvetti M, Vuillerme N. Motor and non-motor symptoms impact on different domains of capacity- and performance- related mobility measures in Parkinson’s disease. npj Parkinsons Dis. 2026. Accepted.
+
 •	Milane T, Vuillerme N, Petit P, Warmerdam E, Romijnders R, Bianchini E, Maetzler W, Hansen C. Impact of forward and backward walking on gait parameters across Parkinson’s disease stages and severity: a prospective observational study. BMC Neurol. 2025;29(1):379. doi : 10.1186/s12883-025-04321-2.
 
 •	Chardon M, Barbieri FA, Hansen C, Petit P, Vuillerme N. Impact of Overweight on Spatial-Temporal Gait Parameters During Obstacle Crossing in Young Adults: A Cross-Sectional Study. Sensors. 2024;24(23):7867. doi: 10.3390/s24237867.
@@ -357,7 +369,7 @@ For questions regarding the scripts or associated studies:
 
 **Pascal Petit**
 
-email: pascal.petit@univ-grenoble-alpes.fr
+email: pascal.petit.researcher@gmail.com
 
 •	*ORCID*: https://orcid.org/0000-0001-9015-5230
 
