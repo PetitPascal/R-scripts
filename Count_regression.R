@@ -1,13 +1,14 @@
 #-------------------------------------------------------------------------------
-## Reproducible & Generalisable Poisson / Negative Binomial Regression Script
-# Covers:
+## Reproducible and generalisable Poisson / negative binomial regression script (count data)
+# 
+# covers:
 #   - Poisson regression (simple and multiple)
-#   - Overdispersion testing and correction (quasi Poisson, negative binomial)
-#   - Zero-inflation checks
-#   - Assumption testing: distribution fit, residuals, influential obs
-#   - Rate models with offset
-#   - Incidence Rate Ratio (IRR) extraction and plots
-#   - Reusable pipeline function
+#   - overdispersion testing and correction (quasi Poisson, negative binomial)
+#   - zero-inflation checks
+#   - assumption testing: distribution fit, residuals, influential obs
+#   - rate models with offset
+#   - incidence Rate Ratio (IRR) extraction and plots
+#   - reusable pipeline function
 #-------------------------------------------------------------------------------
 
 #--------------------------------------------
@@ -82,7 +83,7 @@ dist_check<-tibble(value= c(y_pois, theo_pois),
 
 ggplot(dist_check, aes(x = value, fill = distribution)) +
   geom_density(alpha = 0.5) +
-  labs(title = "Poisson: empirical vs theoretical distribution",
+  labs(title = "Poisson: empirical vs. theoretical distribution",
        x = "Count", y = "Density") +
   scale_fill_manual(values = c("#2166ac","#d6604d")) +
   theme_bw(base_size = 14)
@@ -104,7 +105,7 @@ ggplot(sim_data, aes(x = exposure, y = y_pois)) +
   geom_point(alpha = 0.3) +
   geom_line(aes(y = fitted(mod_pois_simple)), color = "#2166ac",
             linewidth = 1.2) +
-  labs(title = "Simple Poisson: observed (points) vs fitted (line)",
+  labs(title = "Simple Poisson: observed (points) vs. fitted (line)",
        x = "Exposure", y = "Count") +
   theme_bw(base_size = 14)
 
@@ -131,7 +132,7 @@ check_poisson_assumptions<-function(model){
   # Overdispersion (deviance / df)
   disp<-gof_stat/gof_df
   cat("Overdispersion (dev/df):", round(disp, 3),
-      if (disp > 1.5) "*** OVERDISPERSION — use quasiPoisson or NB ***"
+      if (disp > 1.5) "overdispersion — use quasiPoisson or NB"
       else "OK", "\n")
   
   # Formal overdispersion test
@@ -144,21 +145,21 @@ check_poisson_assumptions<-function(model){
   
   # Performance package check
   perf_od <- performance::check_overdispersion(model)
-  print(perf_od)
+  perf_od
   
   # Zero inflation
   obs_zeros <- sum(model$y == 0)
   exp_zeros <- sum(dpois(0, fitted(model)))
   cat("Observed zeros:", obs_zeros,
       "| Expected zeros:", round(exp_zeros, 1),
-      if (obs_zeros > 2 * exp_zeros) "*** ZERO INFLATION ***" else "OK",
+      if (obs_zeros > 2 * exp_zeros) "zero inflation" else "OK",
       "\n")
   
   # Multicollinearity
   vif_r <- tryCatch(car::vif(model), error = function(e) NULL)
   if (!is.null(vif_r))
     cat("Max VIF:", round(max(vif_r), 3),
-        if (max(vif_r) > 5) "*** HIGH VIF ***" else "OK", "\n")
+        if (max(vif_r) > 5) "high VIF" else "OK", "\n")
   
   # Influential observations
   cooks  <- cooks.distance(model)
@@ -314,7 +315,7 @@ aic_df
 mod_pois_null<-glm(y_pois ~ 1, data = sim_data, family = poisson())
 
 # LRT
-print(anova(mod_pois_null, mod_pois, test = "Chisq"))
+anova(mod_pois_null, mod_pois, test = "Chisq")
 
 # AIC/BIC
 AIC(mod_pois_null, mod_pois, mod_nb) %>% arrange(AIC)
@@ -330,7 +331,7 @@ ggstats::ggcoef_compare(list("Poisson" = mod_pois, "Neg. Binomial" = mod_nb),
   type= "faceted",
   intercept= FALSE,
   exponentiate=TRUE) + 
-  labs(title= "Poisson vs NB: coefficient comparison")
+  labs(title= "Poisson vs. NB: coefficient comparison")
 
 #--------------------------------------------
 ## Reusable pipeline
@@ -363,7 +364,7 @@ run_count_pipeline<-function(data, outcome_col,
   }
   
   cat("\nCount model:", family, "\n")
-  print(summary(fit))
+  summary(fit)
   
   # Overdispersion
   if (family == "poisson") {
@@ -376,13 +377,14 @@ run_count_pipeline<-function(data, outcome_col,
   if (family %in% c("poisson","nb")) {
     irr_df <- broom::tidy(fit, conf.int=TRUE, exponentiate=TRUE) %>%
       filter(term != "(Intercept)")
-    cat("\nIRR\n"); print(irr_df)
-    print(plot_irr(irr_df %>%
+    cat("\nIRR\n")
+    irr_df
+    plot_irr(irr_df %>%
                      mutate(sig = case_when(conf.low>1~"IRR > 1",
                                             conf.high<1~"IRR < 1",
                                             TRUE~"NS"),
                             sig = factor(sig, c("IRR < 1","NS","IRR > 1"))),
-                   paste("IRR:", family)))
+                   paste("IRR:", family))
   }
   
   return(fit)
