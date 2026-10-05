@@ -206,6 +206,10 @@ Script for visualizing continuous variable distributions with multiple plot type
 
 Clustering analysis script covering several clustering approaches (e.g., hierarchical, k-means, fuzzy, model-based, density-based, spectral, latent class, Gaussian mixture), as well as graphical representation (e.g., UMAP, t-SNE), and the determination of the optimal number of clusters using several metrics (e.g., elbow, silhouette, gap statistic, NbClust).
 
+•	*Data management.R*
+
+Data management script covering several steps: cleaning (duplicates, harmonization, units, plausibility ranges, outlier flagging), variable dictionary, derived variables, missing data, data imputation), etc.
+
 ---
 
 ***Requirements***
@@ -383,7 +387,9 @@ email: pascal.petit.researcher@gmail.com
 
 •	*Thèse.fr*: https://theses.fr/223750166
 
-***Current affiliation***: unemployed - actively looking for a new position
+***Current affiliation***: 
+
+•	Center for Health Services Research, Brandenburg Medical School, Rüdersdorf, Germany
 
 ***Former affiliations***:
 
