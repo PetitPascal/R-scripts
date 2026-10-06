@@ -545,18 +545,22 @@ data_onehot<-one_hot_encode(data_single, var_dict_final, remove_first_dummy=FALS
 #### Exporting and saving results ####
 
 # Data management log
+log_data<-log_data %>% rowwise %>% mutate_if(is.numeric,test_format) %>% ungroup
 write.table(log_data, paste("Data management log_", Sys.Date(), ".csv", sep=""), sep=";", dec=".", row.names=FALSE, col.names=TRUE)
 
 # Variable dictionary
 write.table(var_dict, paste("Variable dictionary_", Sys.Date(), ".csv", sep=""), sep=";", dec=".", row.names=FALSE, col.names=TRUE)
 
 # Outlier table
+outliers_tab<-outliers_tab %>% rowwise %>% mutate_if(is.numeric,test_format) %>% ungroup
 write.table(outliers_tab, paste("Outliers table_", Sys.Date(), ".csv", sep=""), sep=";", dec=".", row.names=FALSE, col.names=TRUE)
 
 # Missing data tables
+miss_var<-miss_var %>% rowwise %>% mutate_if(is.numeric,test_format) %>% ungroup
 write.table(miss_var, paste("Missing data by variable_", Sys.Date(), ".csv", sep=""), sep=";", dec=".", row.names=FALSE, col.names=TRUE)
 
 # Skewness table
+skew_tab<-skew_tab %>% rowwise %>% mutate_if(is.numeric,test_format) %>% ungroup
 write.table(skew_tab, paste("Skewness table_", Sys.Date(), ".csv", sep=""), sep=";", dec=".", row.names=FALSE, col.names=TRUE)
 
 # Clean dataset without imputation
