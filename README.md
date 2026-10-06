@@ -208,7 +208,11 @@ Clustering analysis script covering several clustering approaches (e.g., hierarc
 
 •	*Data management.R*
 
-Data management script covering several steps: cleaning (duplicates, harmonization, units, plausibility ranges, outlier flagging), variable dictionary, derived variables, missing data, data imputation), etc.
+Data management script covering several topics: cleaning (duplicates, harmonization, units, plausibility ranges, outlier flagging), variable dictionary, derived variables, missing data, data imputation), etc.
+
+•	*EDA.R*
+
+Exploratory data analysis (EDA) script covering several topics: Table 1, pairwise plots, group comparison, correlation, collinearity, dimension reduction, etc.
 
 ---
 
