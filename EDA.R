@@ -407,7 +407,8 @@ plot_cor_matrix<-function(cm, legend_title, sig=NULL){
 #- - - - - -
 ## Saving a plot (png) with a size computed from its content
 
-save_plot<-function(plot, name, width=NULL, height=NULL, panel_w=10, panel_h=8, cm_per_x=1.2, cm_per_y=1, matrix_cell=5, margin_w=4, margin_h=3, dpi=300){
+save_plot<-function(plot, name, width=NULL, height=NULL, panel_w=12, panel_h=8, cm_per_x=1.2, cm_per_y=1, matrix_cell=5,
+                    margin_w=4, margin_h=3, width_max=30, height_max=60, dpi=300){
   if(is.null(width) | is.null(height)){
     if(inherits(plot, "ggmatrix")){
       w_auto<-plot$ncol * matrix_cell + margin_w
@@ -421,11 +422,10 @@ save_plot<-function(plot, name, width=NULL, height=NULL, panel_w=10, panel_h=8, 
       w_auto<-max(lay$COL) * max(panel_w, n_x * cm_per_x) + margin_w
       h_auto<-max(lay$ROW) * max(panel_h, n_y * cm_per_y) + margin_h
     }
-    if(is.null(width)) width<-w_auto
-    if(is.null(height)) height<-h_auto
+    if(is.null(width)) width<-min(w_auto, width_max)
+    if(is.null(height)) height<-min(h_auto, height_max)
   }
   ggsave(plot=plot, filename=paste(name, "_", Sys.Date(), ".png", sep=""), width=width, height=height, units="cm", dpi=dpi, bg="white", limitsize=FALSE)
-  
   message("Figure saved: ", name, "_", Sys.Date(), ".png (", round(width, 1), " x ", round(height, 1), " cm)")
 }
 
