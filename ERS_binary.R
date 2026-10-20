@@ -27,7 +27,7 @@ gctorture(FALSE)
 
 ## Installing and loading packages
 pack_needed<-c("data.table","tidyverse","mllrnrs","broom","doParallel","foreach","splitTools","conflicted","grid","gridExtra","RColorBrewer","mlbench",
-               "mlexperiments","caret","MLmetrics","patchwork","performance","xgboost","parallel","here","scales","dplyr","ggplot2","tidyr",
+               "mlexperiments","caret","MLmetrics","patchwork","performance","xgboost","parallel","here","scales","dplyr","ggplot2","tidyr","qs2",
                "tibble","mgcv","ggforce","gratia","Rcpp","Metrics","MASS","pROC","iml")
 
 is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
@@ -1008,6 +1008,7 @@ cat("Sensitivity:",ers_metrics_full$Sensitivity," Specificity:",ers_metrics_full
 ## Saving ERS model
 saveRDS(step3_result$final_model,paste0("ERS_model_binary_",Sys.Date(),".rds"))
 xgb.save(step3_result$final_model,paste0("ERS_model_binary_",Sys.Date(),".ubj"))
+qs_save(step3_result$final_model,paste0("ERS_model_binary_",Sys.Date(),".qs"))
 
 #----------------------------------------------------------------
 #### Step 4: Overall ERS direction (mixture effect) ####
