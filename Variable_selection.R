@@ -1,17 +1,19 @@
 #-------------------------------------------------------------------------------
-## Reproducible & Generalisable Variable Selection Script
-# Covers: stepAIC, fastbw (rms), ols_step_best_subset (olsrr),GUESS, DSA algorithm, VarSelLCM 
+## Reproducible and generalizable variable selection script
+#
+# covers: stepAIC, fastbw (rms), ols_step_best_subset (olsrr),GUESS, DSA algorithm, VarSelLCM 
 # - Simulates data with sparse true signal
 # - Runs each method and compares selected variable sets
 # - Tests stability via bootstrap
 #-------------------------------------------------------------------------------
 
-#--------------------------------------------
-## Setup
+#----------------------------------------------------------------
+#### Setup ####
+
 rm(list = ls())
 set.seed(123)
 
-required_pkgs <- c("MASS","dplyr","ggplot2","tidyr","caret","rms","olsrr","VarSelLCM","BeSS","glmnet","mombf","partDSA")
+required_pkgs<-c("MASS","dplyr","ggplot2","tidyr","caret","rms","olsrr","VarSelLCM","BeSS","glmnet","mombf","partDSA")
 
 if(!("sparseMatrixStats"%in%.packages(all.available=TRUE))){
   BiocManager::install("sparseMatrixStats")
@@ -23,14 +25,15 @@ if(any(is_installed == FALSE)){
 }
 invisible(lapply(required_pkgs, library, character.only = TRUE))
 
-#--------------------------------------------
-## Simulating data
+#----------------------------------------------------------------
+#### Simulating data ####
+
 n<-400
 p_vars<-20
 
 rho<-0.4
 Sigma<-rho ^ as.matrix(dist(1:p_vars))
-X<- as.data.frame(MASS::mvrnorm(n, mu=rep(0,p_vars), Sigma=Sigma))
+X<-as.data.frame(MASS::mvrnorm(n, mu=rep(0,p_vars), Sigma=Sigma))
 colnames(X)<-paste0("V", seq_len(p_vars))
 
 # True signal: only V1, V2, V3, V5, V8
@@ -45,8 +48,10 @@ true_vars<-c("V1","V2","V3","V5","V8")
 cat("True signal variables:", paste(true_vars, collapse=", "), "\n")
 cat("Outcome R2 (approx):",round(cor(y_cont, as.matrix(X) %*% beta_true)^2, 3), "\n")
 
-## Helper: evaluate selection
-eval_selection <- function(selected, true_vars, all_vars) {
+#----------------------------------------------------------------
+#### Helper creation: evaluate selection ####
+
+eval_selection<-function(selected, true_vars, all_vars){
   tp<-sum(selected %in% true_vars)
   fp<-sum(!(selected %in% true_vars))
   fn<-sum(!(true_vars %in% selected))
@@ -57,14 +62,13 @@ eval_selection <- function(selected, true_vars, all_vars) {
   cat("TP:", tp, "| FP:", fp, "| FN:", fn,
       "| Precision:", round(pre,3), "| Recall:", round(rec,3),
       "| F1:", round(f1,3), "\n")
-  invisible(data.frame(tp=tp, fp=fp, fn=fn,
-                       precision=pre, recall=rec, f1=f1))
+  invisible(data.frame(tp=tp, fp=fp, fn=fn,precision=pre, recall=rec, f1=f1))
 }
 
-all_selected <- list()
+all_selected<-list()
 
-#--------------------------------------------
-## Method 1 - stepAIC (bidirectional)
+#----------------------------------------------------------------
+#### Method 1 - stepAIC (bidirectional) ####
 
 full_model<-lm(y ~ ., data=sim_data[, c("y", paste0("V",1:p_vars))])
 null_model<-lm(y ~ 1, data=sim_data)
@@ -75,10 +79,10 @@ step_aic<-MASS::stepAIC(full_model, direction="both",
 
 selected_aic<-names(coef(step_aic))[-1] # remove intercept
 cat("stepAIC selected variables:\n")
-all_selected$stepAIC <- eval_selection(selected_aic, true_vars, paste0("V",1:p_vars))
+all_selected$stepAIC<-eval_selection(selected_aic, true_vars, paste0("V",1:p_vars))
 
-#--------------------------------------------
-## Method 2 - fastbw (uses backward elimination on rms OLS/lrm models)
+#----------------------------------------------------------------
+#### Method 2 - fastbw (uses backward elimination on rms OLS/lrm models) ####
 
 dd<-rms::datadist(sim_data)
 options(datadist = "dd")
@@ -90,8 +94,8 @@ fbw_res<-rms::fastbw(rms_ols, rule="aic", type="residual")
 selected_fbw<-fbw_res$names.kept
 all_selected$fastbw<-eval_selection(selected_fbw, true_vars, paste0("V",1:p_vars))
 
-#--------------------------------------------
-## Method 3 — ols_step_best_subset (exhaustive search which is computationally expensive for p > ~15)
+#----------------------------------------------------------------
+#### Method 3 — ols_step_best_subset (exhaustive search which is computationally expensive for p > ~15) ####
 
 sub_data<-sim_data[, c("y", paste0("V", 1:12))]
 ols_full<-lm(y ~ ., data=sub_data)
@@ -105,13 +109,11 @@ cat("Best subset (min BIC, k=", best_k, ") variables:\n")
 all_selected$best_subset<-eval_selection(selected_bs, true_vars, paste0("V",1:12))
 
 # Plot BIC vs model size
-plot(best_sub$metrics$n, best_sub$metrics$sbc, type="b",
-     xlab="Number of predictors", ylab="BIC",
-     main="Best subset: BIC by model size")
+plot(best_sub$metrics$n, best_sub$metrics$sbc, type="b", xlab="Number of predictors", ylab="BIC", main="Best subset: BIC by model size")
 abline(v=best_k, lty=2, col="red")
 
-#--------------------------------------------
-## Method 4 - LASSO (glmnet)
+#----------------------------------------------------------------
+#### Method 4 - LASSO (glmnet) ####
 
 X_mat<-as.matrix(sim_data[, paste0("V",1:p_vars)])
 cv_lasso<-glmnet::cv.glmnet(X_mat, y_cont, alpha=1, nfolds=10)
@@ -119,78 +121,65 @@ lasso_coef<-coef(cv_lasso, s="lambda.1se")
 selected_lasso<-rownames(lasso_coef)[lasso_coef[,1] != 0 &rownames(lasso_coef) != "(Intercept)"]
 all_selected$LASSO<-eval_selection(selected_lasso, true_vars, paste0("V",1:p_vars))
 
-#--------------------------------------------
-## Method 5 — VarSelLCM (for mixture/clustering-based selection): it identifies variables that discriminate latent classes
+#----------------------------------------------------------------
+#### Method 5 — VarSelLCM (for mixture/clustering-based selection): it identifies variables that discriminate latent classes ####
 
-if (requireNamespace("VarSelLCM", quietly=TRUE)) {
-  varsel_res <- tryCatch({
-    VarSelLCM::VarSelCluster(
-      x    = as.data.frame(X_mat[, 1:10]),   # subset for speed
-      vbleSelec = TRUE,
-      gvals=3,
-      crit.varsel = "BIC")
+if(requireNamespace("VarSelLCM", quietly=TRUE)){
+  varsel_res<-tryCatch({
+    VarSelLCM::VarSelCluster(x=as.data.frame(X_mat[, 1:10]),   # subset for speed
+      vbleSelec=TRUE, gvals=3, crit.varsel="BIC")
   }, error=function(e){
     message("VarSelLCM failed: ", e$message); NULL
   })
   
-  if(!is.null(varsel_res)) {
-    relevant_vars <- varsel_res@model@names.relevant
-    cat("VarSelLCM relevant variables:",
-        paste(relevant_vars, collapse=", "), "\n")
+  if(!is.null(varsel_res)){
+    relevant_vars<-varsel_res@model@names.relevant
+    cat("VarSelLCM relevant variables:",paste(relevant_vars, collapse=", "), "\n")
   }
-} else {
+}else{
   message("VarSelLCM not available — skipping")
 }
 
-#--------------------------------------------
-## Method 6 — DSA (deletion/substitution/addition)
+#----------------------------------------------------------------
+#### Method 6 — DSA (deletion/substitution/addition) ####
 
   dsa_res<-tryCatch({
-    partDSA::partDSA(x=X_mat[, 1:12],
-      y=y_cont,
-      control=partDSA::DSA.control(
-        MPD=0.1,
-        vfold=5)
-    )
+    partDSA::partDSA(x=X_mat[, 1:12], y=y_cont, control=partDSA::DSA.control(MPD=0.1, vfold=5))
   }, error=function(e){
     message("partDSA failed: ", e$message); NULL
   })
   
-  if (!is.null(dsa_res)) {
+  if(!is.null(dsa_res)){
     cat("\nDSA results\n")
     print(dsa_res)
   }
 
-#--------------------------------------------
-## Method 7 - Graphical Unit Evolutionary Stochastic Search (GUESS) (Bayesian model selection with non-local priors) 
+#----------------------------------------------------------------
+#### Method 7 - Graphical Unit Evolutionary Stochastic Search (GUESS) (Bayesian model selection with non-local priors) ####
 
-ms_res <- tryCatch({
-    mombf::modelSelection(
-      y     = y_cont,
-      x     = X_mat[, 1:12],
-      priorCoef  = mombf::momprior(tau=0.348),
-      priorDelta = mombf::modelbbprior(alpha.p=1, beta.p=1),
-      niter = 5000,
-      verbose = FALSE
-    )
+ms_res<-tryCatch({
+    mombf::modelSelection(y=y_cont,
+      x=X_mat[, 1:12],
+      priorCoef=mombf::momprior(tau=0.348),
+      priorDelta=mombf::modelbbprior(alpha.p=1, beta.p=1),
+      niter=5000,
+      verbose=FALSE)
   }, error=function(e){
     message("mombf failed: ", e$message); NULL
   })
   
-  if (!is.null(ms_res)) {
+  if(!is.null(ms_res)){
     cat("\nmarginal inclusion probabilities\n")
-    mip <- ms_res$margpp
+    mip<-ms_res$margpp
     print(round(mip, 3))
     
-    selected_mombf <- names(mip)[mip > 0.5]
+    selected_mombf<-names(mip)[mip > 0.5]
     cat("Selected (MIP > 0.5):", paste(selected_mombf, collapse=", "), "\n")
-    all_selected$mombf <- eval_selection(
-      selected_mombf, true_vars, paste0("V",1:12)
-    )
+    all_selected$mombf<-eval_selection(selected_mombf, true_vars, paste0("V",1:12))
   }
 
-#--------------------------------------------
-## Bootstrap stability of variable selection - stepAIC
+#----------------------------------------------------------------
+#### Bootstrap stability of variable selection - stepAIC ####
 
 n_boot<-100
 boot_select<-replicate(n_boot, {
@@ -210,13 +199,11 @@ select_freq<-sort(table(unlist(boot_select)) / n_boot,decreasing=TRUE)
 cat("\nBootstrap inclusion frequencies (stepAIC)\n")
 print(round(select_freq, 3))
 
-freq_df<-data.frame(
-  variable=names(select_freq),
+freq_df<-data.frame(variable=names(select_freq),
   frequency=as.numeric(select_freq),
   true_var=names(select_freq) %in% true_vars)
 
-ggplot(freq_df, aes(x=reorder(variable,frequency), y=frequency,
-                    fill=true_var)) +
+ggplot(freq_df, aes(x=reorder(variable,frequency), y=frequency, fill=true_var)) +
   geom_col(color="black") +
   geom_hline(yintercept=0.5, linetype="dashed", color="red") +
   coord_flip() +
@@ -227,12 +214,13 @@ ggplot(freq_df, aes(x=reorder(variable,frequency), y=frequency,
        x="", y="Inclusion frequency", fill="") +
   theme_bw(base_size=13)
 
-#--------------------------------------------
-## Summary comparison across methods
+#----------------------------------------------------------------
+#### Summary comparison across methods ####
+  
 cat("True signal variables:", paste(true_vars, collapse=", "), "\n\n")
 
-result_summary <- do.call(rbind,
-                          lapply(names(all_selected), function(nm) {
+result_summary<-do.call(rbind,
+                          lapply(names(all_selected), function(nm){
                             cbind(method=nm, all_selected[[nm]])
                           })
 )
