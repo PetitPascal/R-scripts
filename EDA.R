@@ -412,11 +412,11 @@ plot_cor_matrix<-function(cm, legend_title, sig=NULL){
 # - a patchwork object cannot be measured: width/height are used (default 25 x 18 cm)
 # - legend_position = NULL keeps the legend of each plot; with several plots, legends are collected
 
-save_plot<-function(plot, name, ncol=1, dpi=300, ext="png", panel_width=9, panel_height=7, legend_position=NULL, margin=0.5, width=NULL, height=NULL){
+save_plot<-function(plot, name, ncol=1, dpi=300, ext="png", panel_width=9, panel_height=7, legend_position=NULL, margin=0.5, width=NULL, height=NULL, ...){
   plots<-if(inherits(plot, "ggplot")) list(plot) else plot
   ncol<-min(ncol, length(plots))
   nrow_p<-ceiling(length(plots)/ncol)
-  file<-paste0(name, "_", Sys.Date(), ".", ext)
+  files<-paste0(name, "_", Sys.Date(), ".", ext) # one file per format
   
   # null device: needed by grid to measure text, without creating a file
   grDevices::pdf(NULL)
@@ -558,8 +558,10 @@ save_plot<-function(plot, name, ncol=1, dpi=300, ext="png", panel_width=9, panel
     if(is.null(width)) width<-sum(grid::convertWidth(gt$widths, "cm", valueOnly=TRUE)) * 1.02 + margin
     if(is.null(height)) height<-sum(grid::convertHeight(gt$heights, "cm", valueOnly=TRUE)) * 1.02 + margin
   }
-  ggplot2::ggsave(plot=fig, filename=file, width=width, height=height, units="cm", dpi=dpi, bg="white", limitsize=FALSE)
-  message("Figure saved: ", file, " (", round(width, 1), " x ", round(height, 1), " cm)")
+  for(f in files){
+    ggplot2::ggsave(plot=fig, filename=f, width=width, height=height, units="cm", dpi=dpi, bg="white", limitsize=FALSE, ...)
+    message("Figure saved: ", f, " (", round(width, 1), " x ", round(height, 1), " cm)")
+  }
   invisible(c(width=width, height=height))
 }
 
@@ -1107,21 +1109,21 @@ export_tab(format_tab(famd_eig), "FAMD_eigenvalues")
 export_tab(format_tab(tibble(variable=rownames(famd$var$contrib), dim1=famd$var$contrib[, 1], dim2=famd$var$contrib[, 2])), "FAMD_contributions")
 
 # Figures
-save_plot(plot_density, "Marker density", dpi=300)
-save_plot(plot_hist, "Marker histograms", dpi=300)
-save_plot(plot_pairs, "Marker pairs", dpi=300)
-save_plot(plot_cor_markers, "Associations_markers and covariates", cm_per_x=1.6, cm_per_y=1.4)
-save_plot(plot_cor_expo, "Associations_exposures", cm_per_x=1.6, cm_per_y=1.4)
-save_plot(plot_scree, "FAMD_scree plot", dpi=300)
-save_plot(plot_var, "FAMD_variables", dpi=300)
-save_plot(plot_circle, "FAMD_correlation circle", dpi=300)
-save_plot(plot_quali, "FAMD_categories", dpi=300)
-save_plot(plot_cos2, "FAMD_cos2", dpi=300)
-save_plot(plot_contrib1, "FAMD_contributions dim 1", dpi=300)
-save_plot(plot_contrib2, "FAMD_contributions dim 2", dpi=300)
-save_plot(plot_contrib, "FAMD_contributions", dpi=300)
-save_plot(plot_ind, "FAMD_individuals", dpi=300)
-save_plot(plot_biplot, "FAMD_biplot", dpi=300)
+save_plot(plot_density, "Marker density", dpi=300,, ext=c("png","pdf","tiff"))
+save_plot(plot_hist, "Marker histograms", dpi=300, ext="png")
+save_plot(plot_pairs, "Marker pairs", dpi=300, ext="png")
+save_plot(plot_cor_markers, "Associations_markers and covariates", cm_per_x=1.6, cm_per_y=1.4, ext="png")
+save_plot(plot_cor_expo, "Associations_exposures", cm_per_x=1.6, cm_per_y=1.4, ext="png")
+save_plot(plot_scree, "FAMD_scree plot", dpi=300, ext="png")
+save_plot(plot_var, "FAMD_variables", dpi=300, ext="png")
+save_plot(plot_circle, "FAMD_correlation circle", dpi=300, ext="png")
+save_plot(plot_quali, "FAMD_categories", dpi=300, ext="png")
+save_plot(plot_cos2, "FAMD_cos2", dpi=300, ext="png")
+save_plot(plot_contrib1, "FAMD_contributions dim 1", dpi=300, ext="png")
+save_plot(plot_contrib2, "FAMD_contributions dim 2", dpi=300, ext="png")
+save_plot(plot_contrib, "FAMD_contributions", dpi=300, ext="png")
+save_plot(plot_ind, "FAMD_individuals", dpi=300, ext="png")
+save_plot(plot_biplot, "FAMD_biplot", dpi=300, ext="tiff", dpi=600, compression="lzw")
 
 # Session information (reproducibility)
 writeLines(capture.output(sessionInfo()), paste("Session info_", Sys.Date(), ".txt", sep=""))
