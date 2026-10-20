@@ -1,9 +1,9 @@
 #-------------------------------------------------------------------------------
-## Reproducible & generalisable G-computation script for a binary outcome
+## Reproducible and generalizable G-computation script for a binary outcome
 #-------------------------------------------------------------------------------
 
-#--------------------------------------------
-## Step 1: Setup
+#----------------------------------------------------------------
+#### Step 1: Setup ####
 
 rm(list=ls())
 set.seed(123)
@@ -16,8 +16,8 @@ if(any(is_installed == FALSE)){
 }
 invisible(lapply(required_pkgs, library, character.only=TRUE))
 
-#--------------------------------------------
-## Step 2: Simulating data (replace with your own)
+#----------------------------------------------------------------
+#### Step 2: Simulating data (replace with your own) ####
 
 n<-600
 K<-6
@@ -37,8 +37,8 @@ y_bin<-rbinom(n, 1, plogis(-1 + 0.015 * cov_df$age + 0.4 * cov_df$sex + 0.05 * c
 
 sim_data<-cbind(data.frame(y=y_bin), cov_df, log1p(expo_df))
 
-#--------------------------------------------
-## Step 3: Assumption checks
+#----------------------------------------------------------------
+#### Step 3: Assumption checks ####
 
 # Positivity: ensuring overlap in exposure distribution across outcome groups
 pos_check<-sim_data %>% group_by(y) %>% summarise(across(all_of(expo_names), mean))
@@ -53,8 +53,8 @@ tab_check<-table(sim_data$y)
 if(min(tab_check)<20) warning("Very few events/non-events — model may not converge reliably.")
 min(tab_check)
 
-#--------------------------------------------
-## Step 4 - Fit logistic model + diagnostics
+#----------------------------------------------------------------
+#### Step 4 - Fit logistic model + diagnostics ####
 
 # Fitting outcome model
 form<-as.formula(paste("y ~", paste(c(expo_names, "age", "sex", "bmi"), collapse=" + ")))
@@ -85,8 +85,8 @@ hl_test<-function(model, g=10){
 }
 hl_test(fit)
 
-#--------------------------------------------
-## Step 5 - g-computation: Q25 vs. Q75
+#----------------------------------------------------------------
+#### Step 5 - g-computation: Q25 vs. Q75 ####
 
 q25<-sapply(sim_data[, expo_names], quantile, 0.25)
 q75<-sapply(sim_data[, expo_names], quantile, 0.75)
@@ -105,8 +105,8 @@ RD
 RR<-p_hi/p_lo # Risk ratio
 RR
 
-#--------------------------------------------
-## Step 6 - Bootstrap confidence intervals
+#----------------------------------------------------------------
+#### Step 6 - Bootstrap confidence intervals ####
 
 boot_fn<-function(data, idx){
   d<-data[idx, ]
@@ -131,8 +131,8 @@ cat("\nBootstrap 95% CIs:\n")
 cat("Risk difference:", round(RD, 4), "[", round(ci_RD$percent[4], 4), ";", round(ci_RD$percent[5], 4), "]\n")
 cat("Risk ratio:", round(RR, 4), "[", round(ci_RR$percent[4], 4), ";", round(ci_RR$percent[5], 4), "]\n")
 
-#--------------------------------------------
-## Step 7: Visualization
+#----------------------------------------------------------------
+#### Step 7: Visualization ####
 
 # Figure 1: Bootstrap distribution on risk difference
 ggplot(data.frame(RD=boot_res$t[, 1]), aes(x=RD)) +
@@ -162,8 +162,8 @@ ggplot(data.frame(quantile=q_seq, prob=pred_seq), aes(quantile, prob)) +
        x="Joint quantile", y="Predicted probability") +
   theme_bw(base_size=14)
 
-#--------------------------------------------
-## Step 8: - Exposure-specific weights
+#----------------------------------------------------------------
+#### Step 8: - Exposure-specific weights ####
 
 form_qgc<-as.formula(paste("y ~", paste(c(expo_names, "age", "sex", "bmi"), collapse=" + ")))
 qgc_fit<-qgcomp::qgcomp.noboot(f=form_qgc, expnms=expo_names, data=sim_data, family=binomial(), q=4)
