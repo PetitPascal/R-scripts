@@ -1,9 +1,9 @@
 #-------------------------------------------------------------------------------
-## Reproducible & generalisable G-computation script for a survival outcome (time-to-event)
+## Reproducible and generalizable G-computation script for a survival outcome (time-to-event)
 #-------------------------------------------------------------------------------
 
-#--------------------------------------------
-## Step 1: Setup
+#----------------------------------------------------------------
+#### Step 1: Setup ####
 
 rm(list=ls())
 set.seed(123)
@@ -16,8 +16,8 @@ if(any(is_installed == FALSE)){
 }
 invisible(lapply(required_pkgs, library, character.only=TRUE))
 
-#--------------------------------------------
-## Step 2: Simulating data (replace with your own)
+#----------------------------------------------------------------
+#### Step 2: Simulating data (replace with your own) ####
 
 n<-600
 K<-6
@@ -44,8 +44,8 @@ event<-as.integer(t_event<=t_censor)
 
 sim_data<-cbind(data.frame(time=time, event=event),cov_df,as.data.frame(log1p(expo_df)))
 
-#--------------------------------------------
-## Step 3: Assumption checks
+#----------------------------------------------------------------
+#### Step 3: Assumption checks ####
 
 cat("Event rate:", round(mean(sim_data$event), 3), "\n")
 if (mean(sim_data$event) < 0.05) warning("Very few events (<5%) — model estimates may be imprecise.")
@@ -53,8 +53,8 @@ if (mean(sim_data$event) < 0.05) warning("Very few events (<5%) — model estima
 cat("Median follow-up time:", round(median(sim_data$time), 2), "\n")
 cat("Max pairwise correlation:", round(max(abs(cor(sim_data[, expo_names], method="spearman")[upper.tri(cor(sim_data[, expo_names]))])), 3), "\n")
 
-#--------------------------------------------
-## Step 4 - Parametric survival model (Weibull via flexsurv)
+#----------------------------------------------------------------
+#### Step 4 - Parametric survival model (Weibull via flexsurv) ####
 
 # Fitting the model
 form_surv<-as.formula(paste("Surv(time, event) ~",paste(c(expo_names, "age", "sex", "bmi"), collapse=" + ")))
@@ -69,8 +69,8 @@ aic_df<-data.frame(Distribution=c("Weibull", "Exponential", "Log-normal"), AIC=c
 aic_df
 best_model<-fit_weibull # change if another fits better
 
-#--------------------------------------------
-## Step 5 - G-computation: cumulative risk at time t_eval (predicting S(t) for each person under Q25 and Q75 scenarios, then computing marginal cumulative risk=1 - mean(S(t)) )
+#----------------------------------------------------------------
+#### Step 5 - G-computation: cumulative risk at time t_eval (predicting S(t) for each person under Q25 and Q75 scenarios, then computing marginal cumulative risk=1 - mean(S(t)) ) ####
 
 t_eval<-median(sim_data$time) # time horizon for cumulative risk, adjust as needed
 cat("\nTime horizon for g-computation:", round(t_eval, 2), "\n")
@@ -105,8 +105,8 @@ cat("Cumulative risk P(T<=t | Q75):", round(risk_hi, 4), "\n")
 cat("Risk difference:", round(RD_surv, 4), "\n")
 cat("Risk ratio:", round(RR_surv,  4), "\n")
 
-#--------------------------------------------
-## Step 6 - Bootstrap confidence intervals
+#----------------------------------------------------------------
+#### Step 6 - Bootstrap confidence intervals ####
 
 boot_fn_surv<-function(data, idx){
   d<-data[idx, ]
@@ -136,8 +136,8 @@ cat("\nBootstrap 95% CIs:\n")
 cat("Risk difference:", round(RD_surv, 4), "[", round(ci_RD$percent[4], 4), ";", round(ci_RD$percent[5], 4), "]\n")
 cat("Risk ratio:", round(RR_surv, 4), "[", round(ci_RR$percent[4], 4), ";", round(ci_RR$percent[5], 4), "]\n")
 
-#--------------------------------------------
-## Step 7: Visualization
+#----------------------------------------------------------------
+#### Step 7: Visualization ####
 
 # Figure 1: Bootstrap distribution of risk difference
 boot_df<-data.frame(RD=boot_res$t[, 1]) %>% filter(!is.na(RD))
