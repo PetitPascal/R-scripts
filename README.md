@@ -214,6 +214,10 @@ Data management script covering several topics: cleaning (duplicates, harmonizat
 
 Exploratory data analysis (EDA) script covering several topics: Table 1, pairwise plots, group comparison, correlation, collinearity, dimension reduction, etc.
 
+•	*Save_plot_automatic.R*
+
+Function to save ggplot2 plots with automatic sizing.
+
 ---
 
 ***Requirements***
