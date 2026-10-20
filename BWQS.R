@@ -1,12 +1,14 @@
 #-------------------------------------------------------------------------------
 ## Reproducible & Generalisable Bayesian Weighted Quantile Sum (BWQS) Script
+#
 # - Simulates correlated mixture exposures, covariates, and a binary outcome
 # - Fits BWQS model using the bwqs package
 # - Tests assumptions, extracts weights, plots results
 #-------------------------------------------------------------------------------
 
-#--------------------------------------------
-## Step 1: Setup
+#----------------------------------------------------------------
+#### Step 1: Setup ####
+
 rm(list = ls())
 set.seed(123)
 
@@ -22,8 +24,9 @@ if(any(is_installed == FALSE)){
 }
 invisible(lapply(required_pkgs, library, character.only = TRUE))
 
-#--------------------------------------------
-## Step 2: Simulating data
+#----------------------------------------------------------------
+#### Step 2: Simulating data ####
+
 n<-400
 K<-8   # number of mixture components
 
@@ -45,8 +48,9 @@ y<-rbinom(n, 1, prob)
 sim_data<-cbind(data.frame(y = y), cov_df, expo_df)
 expo_names<-paste0("chem_", seq_len(K))
 
-#--------------------------------------------
-## Step 3: EDA — correlation among exposures
+#----------------------------------------------------------------
+#### Step 3: EDA — correlation among exposures ####
+
 corr_mat<-cor(log1p(sim_data[, expo_names]), method = "spearman")
 corrplot::corrplot.mixed(corr_mat, tl.cex = 0.8, number.cex = 0.7,
                          main = "Spearman correlation: mixture components")
@@ -56,25 +60,25 @@ par(mfrow = c(2, 4))
 for (v in expo_names) hist(log1p(sim_data[[v]]), main = v, xlab = "log1p")
 par(mfrow = c(1, 1))
 
-#--------------------------------------------
-## Step 4: Quantizing exposures (required by BWQS)
+#----------------------------------------------------------------
+#### Step 4: Quantizing exposures (required by BWQS) ####
+
 # bwqs expects integer quantile-ranked exposures (1 to q)
-quantize<-function(x, q = 4) as.integer(cut(x, breaks = quantile(x, probs = seq(0, 1, 1/q),
-                                                                 na.rm = TRUE),
-                                            include.lowest = TRUE))
+quantize<-function(x, q = 4) as.integer(cut(x, breaks = quantile(x, probs = seq(0, 1, 1/q), na.rm = TRUE), include.lowest = TRUE))
 q_val<-4
 expo_q<-as.data.frame(lapply(sim_data[, expo_names], quantize, q = q_val))
 colnames(expo_q)<-expo_names
 
-#--------------------------------------------
-## Step 5: Fitting BWQS model
+#----------------------------------------------------------------
+#### Step 5: Fitting BWQS model ####
+#
 # bwqs() arguments:
-#   formula : outcome ~ covariates (mixture handled separately via mix_name)
-#   mix_name: character vector of mixture variable names
-#   data: data containing quantized exposures + covariates + outcome
-#   q: number of quantiles already applied
-#   chains/iter: Stan MCMC settings — increase for final analysis
-#   family: "binomial" or "gaussian"
+# - formula : outcome ~ covariates (mixture handled separately via mix_name)
+# - mix_name: character vector of mixture variable names
+# - data: data containing quantized exposures + covariates + outcome
+# - q: number of quantiles already applied
+# - chains/iter: Stan MCMC settings — increase for final analysis
+# - family: "binomial" or "gaussian"
 
 bwqs_data<-cbind(data.frame(y = y), cov_df, expo_q)
 
@@ -92,8 +96,9 @@ bwqs_fit<-BWQS::bwqs(formula= y ~ age + sex,
                      iter=2000,        # increase to 4000+ for publication
                      seed=123)
 
-#--------------------------------------------
-## Step 6: Summarizing posterior
+#----------------------------------------------------------------
+#### Step 6: Summarizing posterior ####
+
 bwqs_fit
 
 # Extracting the weight
@@ -105,10 +110,10 @@ Weight
 beta_summary<-bwqs_fit$summary_fit[grep("beta_wqs|b_wqs", rownames(bwqs_fit$summary_fit)), ]
 beta_summary
 
-#--------------------------------------------
-## Step 7: Assumption / diagnostics checks ----
+#----------------------------------------------------------------
+#### Step 7: Assumption / diagnostics checks ####
 
-# 7a. MCMC convergence: R-hat < 1.01 for all parameters
+# MCMC convergence: R-hat < 1.01 for all parameters
 rhat_vals<-bwqs_fit$summary_fit[, "Rhat"]
 cat("\n--- R-hat diagnostics (should all be < 1.01) ---\n")
 print(summary(rhat_vals))
@@ -116,7 +121,7 @@ if (any(rhat_vals > 1.01, na.rm = TRUE)) {
   warning("Some R-hat > 1.01: consider more iterations or checking priors.")
 }
 
-# 7b. Effective sample size (n_eff)
+# Effective sample size (n_eff)
 neff_vals<-bwqs_fit$summary_fit[, "n_eff"]
 cat("\n--- Effective sample sizes (n_eff) ---\n")
 print(summary(neff_vals))
@@ -124,8 +129,9 @@ if (any(neff_vals < 100, na.rm = TRUE)) {
   warning("Some n_eff < 100: poor mixing. Increase iterations.")
 }
 
-#--------------------------------------------
-## Step 8: Plotting weight
+#----------------------------------------------------------------
+#### Step 8: Plotting weight ####
+
 ggplot(Weight, aes(x = reorder(exposure, mean), y = mean)) +
   geom_col(fill = "steelblue") +
   coord_flip() +
@@ -140,8 +146,9 @@ ggplot(Weight, aes(x = reorder(exposure, mean), y = mean)) +
   labs(x = NULL, y = "Posterior mean weight") +
   theme_minimal()
 
-#--------------------------------------------
-## Step 9: Plotting mixture effect
+#----------------------------------------------------------------
+#### Step 9: Plotting mixture effect ####
+
 library(bayesplot)
 
 beta1_draws <- as.data.frame(rstan::extract(bwqs_fit$fit)$beta1)
