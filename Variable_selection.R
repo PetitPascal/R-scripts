@@ -1,7 +1,7 @@
 #-------------------------------------------------------------------------------
 ## Reproducible and generalizable variable selection script
 #
-# covers: stepAIC, fastbw (rms), ols_step_best_subset (olsrr),GUESS, DSA algorithm, VarSelLCM 
+# covers: stepAIC, fastbw (rms), ols_step_best_subset (olsrr), GUESS, DSA algorithm, VarSelLCM 
 # - Simulates data with sparse true signal
 # - Runs each method and compares selected variable sets
 # - Tests stability via bootstrap
