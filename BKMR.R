@@ -7,9 +7,8 @@
 # - Use it as a template for your own dataset by replacing the simulated data
 #-------------------------------------------------------------------------------
 
-## -------------------------
-## Step 1 - Setup
-## -------------------------
+#----------------------------------------------------------------
+#### Step 1 - Setup ####
 
 ## Packages
 required_pkgs<-c("bkmr", "fields", "openxlsx", "ggplot2", "corrplot", "MASS", "dplyr", "tidyr",
@@ -23,7 +22,8 @@ invisible(lapply(required_pkgs, library, character.only=TRUE))
 ## Seed
 set.seed(123)  # reproducibility seed (change as needed)
 
-## Helpers
+#----------------------------------------------------------------
+#### Step 2 - Creating helpers ####
 
 # Small helper to standardize a matrix (center and scale)
 standardize_mat<-function(m){
@@ -151,14 +151,13 @@ bkmr_dir_pairwise<-function(z_vec, est_vec, majority_threshold=0.55,
                      n_quantile_bins=n_quantile_bins)
 }
 
-## -------------------------
-## Step 2 - Simulating a dataset
+#----------------------------------------------------------------
+#### Step 3 - Simulating a dataset ####
 #
 # - replace this block with code to load your own data
 # - or set outcome_type to "gaussian" (continuous) or "binomial" (binary)
-#
-## -------------------------
-
+        
+# Defining the outcome type
 outcome_type<-"binomial" # can be set to "gaussian" or "binomial"
 
 n<-500
@@ -201,9 +200,8 @@ if(outcome_type=="binomial"){
 # Combining into one data.frame
 sim_data<-bind_cols(data.frame(id=seq_len(n), outcome=outcome_y), cov_df, expo_df)
 
-## -------------------------
-## Step 3 - EDA: correlation matrix of exposures + pairs plot (small)
-## -------------------------
+#----------------------------------------------------------------
+#### Step 4 - EDA: correlation matrix of exposures + pairs plot (small) ####
 
 expo_mat<-as.matrix(sim_data %>% select(starts_with("X_")))
 corrplot::corrplot.mixed(cor(expo_mat, method="spearman"), 
@@ -213,20 +211,18 @@ corrplot::corrplot.mixed(cor(expo_mat, method="spearman"),
 ## optional pairs: (comment out if too large)
 # pairs(log(expo_mat + 1), main="Pairwise log-exposure relationships")
 
-## -------------------------
-## Step 4 - Preparing matrices for BKMR (standardized exposures)
-## -------------------------
+#----------------------------------------------------------------
+#### Step 5 - Preparing matrices for BKMR (standardized exposures) ####
 
 expo_std<-standardize_mat(log(expo_mat + 1))  # log + standardization
 covs_matrix<-as.matrix(sim_data %>% select(age_years, bmi, sex_male))
 outcome_vector<-sim_data$outcome
 expo_names<-colnames(expo_std) # names for exposures for plotting labels
 
-## -------------------------
-## Step 5 - Determining knots (cover.design) and groups (optional)
+#----------------------------------------------------------------
+#### Step 6 - Determining knots (cover.design) and groups (optional) ####
 #  
-#  knots: choose number based on n and complexity (rule of thumb: 25-100)
-## -------------------------
+# - knots: choose number based on n and complexity (rule of thumb: 25-100)
 
 # Choosing 50 knots by default (change as needed)
 num_knots<-50
@@ -236,15 +232,15 @@ knots_coords<-fields::cover.design(expo_std, nd=num_knots)$design
 # you can create a vector length p_exposures specifying group ids or leave NULL
 group_vector<-c(1,1,2,3,3,4,4,5,6,7)  # arbitrary example; change if you have domain knowledge
 
-## -------------------------
-## Step 6 - Fitting BKMR model
-## -------------------------
-## NOTES:
+#----------------------------------------------------------------
+#### Step 7 - Fitting BKMR model ####
+#
 # - family="binomial" for binary outcome
-# - iter: set to 5000 for demonstration; consider 10000-30000 for final inference
+# - iter: set to 5000 for demonstration (consider 10000-30000 for final inference)
 # - varsel=TRUE enables variable selection (PIPs)
 # - est.h=TRUE will estimate h(z) for predictor-response plots
-# - control.params can be tuned; r.jump2 controls MCMC mixing for h
+# - control.params can be tuned
+# - r.jump2 controls MCMC mixing for h
 
 set.seed(123)
 bkmr_fit<-kmbayes(y=outcome_vector,
@@ -259,9 +255,8 @@ bkmr_fit<-kmbayes(y=outcome_vector,
   verbose=TRUE,
   control.params=list(r.jump2=0.5))
 
-## -------------------------
-## Step 7 - Posterior inclusion probabilities (PIPs) and variable selection
-## -------------------------
+#----------------------------------------------------------------
+#### Step 8 - Posterior inclusion probabilities (PIPs) and variable selection ####
 
 ## Extracting PIPs
 pip_df<-ExtractPIPs(bkmr_fit)
@@ -285,8 +280,7 @@ direction_df<-pred_univar %>%
         if(tbl[1]>=2) names(tbl)[1] else "uncertain"
       }))
 
-# Sensitivity check - direction from SingVarRiskSummaries (mixture context)
-# Uses the sign of the estimate when other exposures are at their median (q.fixed=0.5)
+# Sensitivity check - direction from SingVarRiskSummaries (mixture context): uses the sign of the estimate when other exposures are at their median (q.fixed=0.5)
 single_risks_dir<-single_risks %>%
   filter(q.fixed==0.5) %>%
   mutate(dir_mixture=case_when(est>0~"risk factor",
@@ -359,9 +353,8 @@ ggplot(pip_plot_df, aes(x=reorder(variable, PIP), y=PIP,
         legend.position="top",
         axis.line=element_line(color="black",size=0.1, linetype="solid"))
 
-## -------------------------
-## Step 8 - Univariate predictor-response functions: effect of each exposure holding others at median
-## -------------------------
+#----------------------------------------------------------------
+#### Step 9 - Univariate predictor-response functions: effect of each exposure holding others at median ####
 
 ggplot(pred_univar, aes(z, est, ymin=est - 1.96 * se, ymax=est + 1.96 * se)) +
   geom_ribbon(alpha=0.18) +
@@ -380,9 +373,8 @@ ggplot(pred_univar, aes(z, est, ymin=est - 1.96 * se, ymax=est + 1.96 * se)) +
         legend.position="bottom",
         axis.line=element_line(color="black",size=0.1, linetype="solid"))
 
-## -------------------------
-## Step 9 - Overall mixture risk summary
-## -------------------------
+#----------------------------------------------------------------
+#### Step 10 - Overall mixture risk summary ####
 
 qs_seq<-seq(0.25, 0.75, by=0.05)
 overall_risks<-OverallRiskSummaries(fit=bkmr_fit, qs=qs_seq, q.fixed=0.5)
@@ -454,9 +446,8 @@ ggplot(overall_risks, aes(quantile, est,
        x="Quantile of joint change", y="Estimated change in h(z)") +
   theme_bw(base_size=14)
 
-## -------------------------
-## Step 10 - Single-exposure risk summaries (pairwise comparisons)
-## -------------------------
+#----------------------------------------------------------------
+#### Step 11 - Single-exposure risk summaries (pairwise comparisons) ####
 
 single_risks<-SingVarRiskSummaries(fit=bkmr_fit,
   y=outcome_vector,
@@ -486,9 +477,8 @@ ggplot(single_risks, aes(x=variable, y=est,
         legend.position="bottom",
         axis.line=element_line(color="black",size=0.1, linetype="solid"))
 
-# ## -------------------------
-# ## Step 11 - Interaction plot: bivariate predictor-response (i.e., effect of X_i at different levels of X_j)
-# ## -------------------------
+# #----------------------------------------------------------------
+# #### Step 12 - Interaction plot: bivariate predictor-response (i.e., effect of X_i at different levels of X_j) ####
 # 
 # # Choosing pairs to investigate (either from domain knowledge or highest PIPs)
 # top_vars<-pip_plot_df %>% arrange(desc(PIP)) %>% pull(variable)
@@ -541,9 +531,8 @@ ggplot(single_risks, aes(x=variable, y=est,
 #   print(p)
 # }
 
-## -------------------------
-## Step 12 - Saving the model
-## -------------------------
+##----------------------------------------------------------------
+##### Step 12 - Saving the model ####
 
 # # Basic trace plot for kernel parameters if available
 # if(!is.null(bkmr_fit$chain$h)){
@@ -564,13 +553,10 @@ ggplot(single_risks, aes(x=variable, y=est,
 saveRDS(bkmr_fit, file="bkmr_fit_example.rds")
 message("Saved fitted BKMR object to: bkmr_fit_example.rds")
 
-## -------------------------
-## Notes & recommendations
-## -------------------------
+#----------------------------------------------------------------
+#### Notes & recommendations ####
 cat("Notes:
-- This script simulates data for demonstration. To use your own data, replace the simulation block
-  and set 'expo_std', 'covs_matrix', and 'outcome_vector' accordingly.
-- For final inference increase 'iter' (e.g., 10000-30000) and check mixing (trace plots) and effective
-  sample sizes. MCMC heavy computations can take many minutes to hours depending on data and iter.
+- This script simulates data for demonstration. To use your own data, replace the simulation block and set 'expo_std', 'covs_matrix', and 'outcome_vector' accordingly.
+- For final inference increase 'iter' (e.g., 10000-30000) and check mixing (trace plots) and effective sample sizes. MCMC heavy computations can take many minutes to hours depending on data and iter.
 - Consider sensitivity analyses: different knot numbers, different priors, or excluding influential observations.
 - If you have domain knowledge for grouping exposures (e.g., chemical classes), use the 'groups' argument.")
