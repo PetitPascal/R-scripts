@@ -1,5 +1,6 @@
-#-------------------------------------------------------------------------------
-## Reproducible & Generalisable Multinomial Regression Script
+#----------------------------------------------------------------
+#### Reproducible and generalizable multinomial regression script
+#
 # - Simulates data with a 4-category outcome
 # - Fits multinomial logistic regression via nnet::multinom
 # - Tests assumptions: IIA (Hausman-McFadden), multicollinearity, model fit
@@ -7,8 +8,9 @@
 # - Includes run_multinom_pipeline() wrapper
 #-------------------------------------------------------------------------------
 
-#--------------------------------------------
-## Step 1: Setup
+#----------------------------------------------------------------
+#### Step 1: Setup ####
+
 rm(list = ls())
 set.seed(123)
 
@@ -20,8 +22,9 @@ if(any(is_installed == FALSE)){
 }
 invisible(lapply(required_pkgs, library, character.only = TRUE))
 
-#--------------------------------------------
-## Step 2: Simulating dat
+#----------------------------------------------------------------
+#### Step 2: Simulating data ####
+
 n<-800
 
 age<-rnorm(n, 50, 12)
@@ -55,8 +58,8 @@ sim_data<-data.frame(
 cat("Outcome distribution:\n")
 prop.table(table(sim_data$outcome))
 
-#--------------------------------------------
-## Step 3: Assumption checks
+#----------------------------------------------------------------
+#### Step 3: Assumption checks ####
 
 # 3a. Outcome category frequencies (each should be >= ~5% for stable estimation)
 freq_tab <- prop.table(table(sim_data$outcome))
@@ -71,9 +74,11 @@ round(vif_lm, 3)
 # 3c. Cell sizes: cross-tab predictors vs outcome (for categorical predictors)
 table(sim_data$sex, sim_data$outcome)
 
-#--------------------------------------------
-## Step 4: Fit multinomial logistic regression
+#----------------------------------------------------------------
+#### Step 4: Fit multinomial logistic regression ####
+#
 # Reference category = "cat1" (first level)
+             
 sim_data$outcome <- relevel(sim_data$outcome, ref = "cat1")
 
 multinom_fit <- nnet::multinom(outcome ~ age + sex + bmi + score + smoke,
@@ -87,14 +92,16 @@ broom.helpers::tidy_plus_plus(multinom_fit, exponentiate = TRUE)
 # questionr::odds.ratio(multinom_fit)
 # tbl_regression(multinom_fit,exponentiate = T)
 
-#--------------------------------------------
-## Step 5: Wald tests and p-values
+#----------------------------------------------------------------
+#### Step 5: Wald tests and p-values ####
+             
 z_scores<-summary(multinom_fit)$coefficients/summary(multinom_fit)$standard.errors
 p_values<-2 * (1 - pnorm(abs(z_scores)))
 round(p_values, 4)
 
-#--------------------------------------------
-## Step 6: Relative Risk Ratios (RRR = exp(coef))
+#----------------------------------------------------------------
+#### Step 6: Relative Risk Ratios (RRR = exp(coef)) ####
+             
 rrr_df <- broom::tidy(multinom_fit, exponentiate = TRUE, conf.int = TRUE)
 rrr_df
 
@@ -112,8 +119,8 @@ rrr_df %>%
 
 # ggstats::ggcoef_faceted(multinom_fit,exponentiate = TRUE)
 
-#--------------------------------------------
-## Step 7: Model fitting
+#----------------------------------------------------------------
+#### Step 7: Model fitting ####
 
 # Null model
 null_fit<-nnet::multinom(outcome ~ 1, data = sim_data, trace = FALSE)
@@ -136,11 +143,11 @@ round(mcfadden_r2, 4)
 cat("AIC:", round(AIC(multinom_fit), 2), "\n")
 cat("BIC:", round(BIC(multinom_fit), 2), "\n")
 
-#--------------------------------------------
-## Step 8: Test of Independence of Irrelevant Alternatives (IIA)
-
-# Hausman-McFadden test: re-estimate dropping one category at a time
-# If IIA holds, coefficients should not change significantly
+#----------------------------------------------------------------
+#### Step 8: Test of Independence of Irrelevant Alternatives (IIA) ####
+#
+# - Hausman-McFadden test: re-estimate dropping one category at a time
+# - If IIA holds, coefficients should not change significantly
 
 iia_test<-function(full_model, data, drop_cat) {
   sub_data<-data %>% filter(outcome != drop_cat) %>%
@@ -165,8 +172,8 @@ for (cat_drop in c("cat2","cat3","cat4")) {
            error = function(e) cat("IIA test failed for:", cat_drop, "\n"))
 }
 
-#--------------------------------------------
-## Step 9: Marginal effects
+#----------------------------------------------------------------
+#### Step 9: Marginal effects ####
 
 # Average marginal effects
 if (requireNamespace("marginaleffects", quietly = TRUE)) {
@@ -176,8 +183,8 @@ if (requireNamespace("marginaleffects", quietly = TRUE)) {
   print(me)
 }
 
-#--------------------------------------------
-## Step 10: Predicted probabilities plot
+#----------------------------------------------------------------
+#### Step 10: Predicted probabilities plot ####
 
 # Predicting over range of 'score' holding others at median/mode
 score_seq<-seq(min(sim_data$score), max(sim_data$score), length.out = 100)
@@ -197,8 +204,9 @@ ggplot(pred_df, aes(x = score, y = prob, color = category)) +
        x = "Score", y = "Predicted probability", color = "Category") +
   theme_bw(base_size = 14)
 
-#--------------------------------------------
-## Step 11: summary table
+#----------------------------------------------------------------
+#### Step 11: summary table ####
+           
 tbl_multinom <- sim_data %>%
   gtsummary::tbl_uvregression(
     method= nnet::multinom,
@@ -207,8 +215,9 @@ tbl_multinom <- sim_data %>%
     hide_n= TRUE)
 print(tbl_multinom)
 
-#--------------------------------------------
-## Step 12: Reusable pipeline
+#----------------------------------------------------------------
+#### Step 12: Reusable pipeline ####
+           
 run_multinom_pipeline <- function(data, outcome_col, predictor_cols,
                                   ref_cat = NULL, seed = 2025) {
   set.seed(seed)
