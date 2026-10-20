@@ -1,6 +1,5 @@
 #------------------------------------------------------------------
 #### Configurations  ####
-#------------------------------------------------------------------
 
 ## Installing and loading packages
 pack_needed<-c("tidyverse","ggridges")
@@ -13,7 +12,6 @@ invisible(lapply(pack_needed, library, character.only = TRUE))
 
 #------------------------------------------------------------------
 #### Creating a simulated dataset  ####
-#------------------------------------------------------------------
 
 # Number of time periods or factors to consider (e.g., 5 in this example)
 nb_periode<-5
@@ -49,7 +47,6 @@ tab_data$Profession<-rep(c("Job1","Job2","Job3","Job4"),nrow(tab_data)/4)
 
 #------------------------------------------------------------------
 #### Graphical representation  ####
-#------------------------------------------------------------------
 
 # Graph 1 - density plots on the same window/figure
 tab_data %>% ggplot()+ geom_density(aes(x=Valeur,group=factor(Periode),
