@@ -1,29 +1,25 @@
-# ==============================================================================
-# Main script information
-# ==============================================================================
-
-# Description: A generic, reproducible Cox PH regression script covering:
-#              - Data import and preprocessing
-#              - Model fitting and characterization
-#              - Full assumption testing:
-#                  (1) Independence assumption (cluster-robust SE)
-#                  (2) Proportional hazards assumption (Schoenfeld residuals)
-#                  (3) Linearity assumption (Martingale residuals / restricted cubic splines)
-#                  (4) No multicollinearity (VIF)
-#                  (5) No effect modification (interaction tests, e.g., by sex)
-#              - PH violation remediation:
-#                  Approach 1: covariate × time interaction terms
-#                  Approach 2: time-dependent covariates (counting-process format, with optional timeSplitter from Greg package)
-#              - Competing risks analysis (Fine-Gray subdistribution hazard model)
-#              - Interaction / effect modification test (e.g., sex)
-#              - Visualization (forest plots, KM curves, cumulative hazard/events)
+#----------------------------------------------------------------
+#### Description: A generic, reproducible Cox PH regression script covering:
 #
-# NOTE: All user-defined parameters are clearly flagged with user comments.
-#       To adapt this script to your own data, search for user and edit only those sections.
+# - Data import and preprocessing
+# - Model fitting and characterization
+# - Full assumption testing:
+#    (1) Independence assumption (cluster-robust SE)
+#    (2) Proportional hazards assumption (Schoenfeld residuals)
+#    (3) Linearity assumption (Martingale residuals / restricted cubic splines)
+#    (4) No multicollinearity (VIF)
+#    (5) No effect modification (interaction tests, e.g., by sex)
+# - PH violation remediation:
+#    ¤ Approach 1: covariate × time interaction terms
+#    ¤ Approach 2: time-dependent covariates (counting-process format, with optional timeSplitter from Greg package)
+# - Competing risks analysis (Fine-Gray subdistribution hazard model)
+# - Interaction / effect modification test (e.g., sex)
+# - Visualization (forest plots, KM curves, cumulative hazard/events)
+#
+# Note: All user-defined parameters are clearly flagged with user comments. To adapt this script to your own data, search for user and edit only those sections.
 
-# ==============================================================================
+#----------------------------------------------------------------
 #### Configurations ####
-# ==============================================================================
 
 ## Disabling memory torture
 gctorture(FALSE)
@@ -48,14 +44,13 @@ conflict_prefer("summarize", "dplyr")
 ## Setting the working directory
 here::here("Cox proportional hazards regression analysis")
 
-## Output folder - user Change the output folder path if needed
+## Output folder - user should change the output folder path if needed
 output_dir<-"Results"
 if(!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 safe_path<-function(filename) file.path(output_dir, filename)
 
-# ==============================================================================
+#----------------------------------------------------------------
 #### Creating functions ####
-# ==============================================================================
 
 ## Function for formatting the display of summary statistics
 test_format<-function(x){
@@ -145,30 +140,26 @@ to_filename<-function(label){
     str_trunc(60, ellipsis = "")             # cap length for OS safety
 }
 
-# ==============================================================================
+#----------------------------------------------------------------
 #### Data import and preprocessing ####
-# ==============================================================================
-
-#----------------------------------------------------------------
-## user Replace the block below with your own data import
-##          Ensure your final data frame is named `clean_data` and contains:
-##            - time_var: the follow-up time variable (numeric)
-##            - event_var: the event indicator (0 = censored, 1 = event)
-##            - covariates: all predictor variables
-##            - (optional): competing event indicator (0/1/2, etc.)
-##            - (optional): a cluster/frailty variable if independence is violated
-#----------------------------------------------------------------
+#
+# - replace the block below with your own data import and ensure your final data frame is named `clean_data` and contains:
+# - time_var: the follow-up time variable (numeric)
+# - event_var: the event indicator (0 = censored, 1 = event)
+# - covariates: all predictor variables
+# - (optional): competing event indicator (0/1/2, etc.)
+# - (optional): a cluster/frailty variable if independence is violated
 
 ## Importing the clean dataset - example: survival::colon dataset
 clean_data<-as_tibble(na.omit(survival::colon) %>% filter(etype == 2) %>% select(-c(etype,study)) %>%
                       mutate(rx=case_when(rx=="Obs"~0,rx=="Lev"~1,T~2)))
 
-## Renaming outcome variables - user Adjust variable names to match your dataset
+## Renaming outcome variables - user should adjust variable names to match your dataset
 clean_data<-clean_data %>%
             rename(Disease_status=status,
                    time_to_diagnosis=time)
 
-## Analysis setting - user Set all key parameters here
+## Analysis setting - user should set all key parameters here
 
 # Outcome
 time_var<-"time_to_diagnosis"   # name of the time variable
@@ -207,9 +198,8 @@ use_time_splitter<-TRUE
 # Number of knots for restricted cubic splines (linearity check)
 rcs_knots<-4
 
-# ==============================================================================
-#### Descritive statistics
-# ==============================================================================
+#----------------------------------------------------------------
+#### Descritive statistics ####
 
 desc_table<-clean_data %>%
             select(all_of(c(time_var, event_var, covariates))) %>%
@@ -225,9 +215,8 @@ fwrite(as_tibble(as.data.frame(desc_table)),
        safe_path(paste0("Descriptive_statistics_", Sys.Date(), ".csv")),
        sep = ";")
 
-# ==============================================================================
-#### Main Cox proportional hazards regression model
-# ==============================================================================
+#----------------------------------------------------------------
+#### Main Cox proportional hazards regression model ####
 
 ## Building the survival formula
 surv_formula_str<-paste0("Surv(", time_var, ", ", event_var, ") ~ ",paste(covariates, collapse = " + "))
@@ -279,9 +268,8 @@ fwrite(cox_mod_charact,safe_path(paste0("Model_characteristics_", Sys.Date(), ".
 fwrite(X_time_surv_df,safe_path(paste0("Survival_at_X_time_", Sys.Date(), ".csv")),sep = ";")
 fwrite(as_tibble(data.frame(lrt_results), rownames = "term"),safe_path(paste0("LR test_", Sys.Date(), ".csv")),sep = ";")
 
-# ==============================================================================
-#### Residual diagnostics
-# ==============================================================================
+#----------------------------------------------------------------
+#### Residual diagnostics ####
 
 ## Deviance residuals (should be ~N(0,1) under correct model)
 dev_resi<-ggcoxdiagnostics(cox_mod, type = "deviance",   ggtheme = theme_bw())
@@ -332,19 +320,18 @@ schs_resi
 ggsave(schs_resi, file = safe_path(paste0("Scaled Schoenfeld residuals_", Sys.Date(), ".png")),
        dpi = 600, width = 20, height = 10, units = "cm", limitsize = FALSE)
 
-# ==============================================================================
-#### Assumption testing
-# ==============================================================================
+#----------------------------------------------------------------
+#### Assumption testing ####
 
 #- - - - - - - - - - - - - - - -
 ## Independence assumption
-
+#
 # The Cox model assumes that subjects are independent. Violations arise from:
-#   - clustered data (patients within hospitals, families, etc.)
-#   - repeated / matched observations
+# - clustered data (patients within hospitals, families, etc.)
+# - repeated / matched observations
 # Strategy:
-#   (a) If cluster_var is specified then cluster-robust SEs already applied above
-#   (b) Optionally fit a shared frailty model as a sensitivity check
+# (a) If cluster_var is specified then cluster-robust SEs already applied above
+# (b) Optionally fit a shared frailty model as a sensitivity check
 # A frailty model explicitly models unobserved heterogeneity within clusters
 
 if(!is.null(cluster_var)){ # with shared frailty model (sensitivity check)
@@ -358,10 +345,10 @@ if(!is.null(cluster_var)){ # with shared frailty model (sensitivity check)
 
 #- - - - - - - - - - - - - - - -
 ## Proportional hazards (PH) assumption
-
-# Approach 1 : Scaled Schoenfeld residuals (cox.zph) – global and per-covariate
-# Approach 2 : log(-log(S(t))) vs. log(t) plot for categorical covariates
-# p-value < alpha_ph indicates a PH violation
+#
+# - Approach 1 : Scaled Schoenfeld residuals (cox.zph) – global and per-covariate
+# - Approach 2 : log(-log(S(t))) vs. log(t) plot for categorical covariates
+# - p-value < alpha_ph indicates a PH violation
 
 PH_test<-cox.zph(cox_mod)
 ph_summary<-tidy_ph_test(PH_test)
@@ -399,9 +386,9 @@ fwrite(ph_summary,safe_path(paste0("PH_test_results_", Sys.Date(), ".csv")),sep 
 
 #- - - - - - - - - - - - - - - -
 ## Linearity assumption (for continuous covariates only)
-
-# Approach 1 : Martingale residuals from a null model plotted against each continuous covariate (non-linear relationship=curve)
-# Approach 2 : Restricted cubic splines (RCS) via rms::cph() and rms::anova(). A non-linear (p<alpha_ph) term suggests linearity is violated
+#
+# - Approach 1 : Martingale residuals from a null model plotted against each continuous covariate (non-linear relationship=curve)
+# - Approach 2 : Restricted cubic splines (RCS) via rms::cph() and rms::anova(). A non-linear (p<alpha_ph) term suggests linearity is violated
 
 # Creating the null model
 null_mod  <- coxph(as.formula(paste0("Surv(", time_var, ", ", event_var, ") ~ 1")),data = clean_data)
@@ -465,9 +452,9 @@ if(length(cont_covariates)>1&length(cont_covariates)<=10) {
 
 #- - - - - - - - - - - - - - - -
 ## Interaction test (effect modification)
-
-# Testing whether the effect of covariates differs across strata of the interaction_var (default: sex)
-# Approach: Add covariate × interaction_var terms and compare via likelihood-ratio test 
+#
+# - Testing whether the effect of covariates differs across strata of the interaction_var (default: sex)
+# - Approach: Add covariate × interaction_var terms and compare via likelihood-ratio test 
 
 if(!is.null(interaction_var) && interaction_var %in% covariates){ # if interaction_var is not NULL
   
@@ -514,14 +501,13 @@ if(!is.null(interaction_var) && interaction_var %in% covariates){ # if interacti
   fwrite(interaction_results,safe_path(paste0("Interaction_test_", interaction_var, "_", Sys.Date(), ".csv")),sep = ";")
 }
 
-# ==============================================================================
-#### In case of PH violation
-# ==============================================================================
+#----------------------------------------------------------------
+#### In case of PH violation ####
 
 if(length(ph_violated_vars)>1){
   
   #- - - - - - - - - - - - - - - -
-  ## Approach 1: covariate × log(time) interaction terms - user covariate x time is also possible
+  ## Approach 1: covariate × log(time) interaction terms - covariate x time is also possible
   
   # Building time-transformation using tt() terms for violated covariates
   tt_terms<-paste0("tt(", ph_violated_vars, ")")
@@ -554,15 +540,15 @@ if(length(ph_violated_vars)>1){
   
   #- - - - - - - - - - - - - - - -
   ## Approach 2: time-dependent covariates (counting-process format)
-  
-  # Reformating the data into (tstart, tstop, event) counting-process format
-  # PH-violating covariates are interacted with a piecewise-constant function of time (binary indicator: t > time_split_point), making them truly time-dependent
   #
-  # Two sub-approaches:
+  # - Reformating the data into (tstart, tstop, event) counting-process format
+  # - PH-violating covariates are interacted with a piecewise-constant function of time (binary indicator: t > time_split_point), making them truly time-dependent
+  #
+  # - Two sub-approaches:
   #   A: manual time splitting at the median follow-up time (or user-defined)
   #   B: using Greg::timeSplitter (flexible interval splits)
   
-  # user Set time split points (e.g., quartiles of follow-up)
+  # user should set time split points (e.g., quartiles of follow-up)
   time_split_points<-quantile(clean_data[[time_var]], probs = c(0.25, 0.5, 0.75))
   
   # A - Manual time splitting
@@ -600,8 +586,8 @@ if(length(ph_violated_vars)>1){
   
   # B - using Greg::timeSplitter
   if(use_time_splitter){
-    ## user Set split_by to your time unit (e.g., 365.25 = years from days)
-    ## user Adjust t.start and t.event to the correct column names after data re-coding if they differ from tstart / time_to_diagnosis
+    ## user should set split_by to your time unit (e.g., 365.25 = years from days)
+    ## user should adjust t.start and t.event to the correct column names after data re-coding if they differ from tstart / time_to_diagnosis
     
     # timeSplitter requires an ID variable – adding one if absent
     if(!ID_obs %in% colnames(clean_data)){
@@ -611,7 +597,7 @@ if(length(ph_violated_vars)>1){
       colnames(clean_data_ts)[which(colnames(clean_data_ts)==ID_obs)]<-"id"
     }
     
-    # Splitting time axis into intervals of equal length - user Adjust split_by and max.follow to match your time scale
+    # Splitting time axis into intervals of equal length - user should adjust split_by and max.follow to match your time scale
     split_by<-median(clean_data_ts[[time_var]])/4  # quarterly splits
     max_follow<-max(clean_data_ts[[time_var]])
     
@@ -660,12 +646,11 @@ if(length(ph_violated_vars)>1){
   
 }
 
-# ==============================================================================
-#### Competing risk analysis
-# ==============================================================================
-
-# Approach: competing_risk_var is specified, fitting a Fine-Gray subdistribution hazard
-# Requirements: competing_risk_var must be a factor with levels: 0 = censored, 1 = event of interest, 2 = competing event
+#----------------------------------------------------------------
+#### Competing risk analysis ####
+#
+# - Approach: competing_risk_var is specified, fitting a Fine-Gray subdistribution hazard
+# - Requirements: competing_risk_var must be a factor with levels: 0 = censored, 1 = event of interest, 2 = competing event
 
 if(!is.null(competing_risk_var) && competing_risk_var %in% colnames(clean_data)){
   
@@ -764,9 +749,8 @@ if(!is.null(competing_risk_var) && competing_risk_var %in% colnames(clean_data))
   
 }
 
-# ==============================================================================
-#### Visualisation
-# ==============================================================================
+#----------------------------------------------------------------
+#### Visualization ####
 
 ## Collecting all models in a named list
 model_list<-list("Cox model"=if(exists("cox_mod"))cox_mod,
