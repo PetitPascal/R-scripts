@@ -1,5 +1,6 @@
 #-------------------------------------------------------------------------------
-## Reproducible & Generalisable Linear Regression Script
+## Reproducible and generalizable Linear Regression script
+#
 # Covers: simple LR, multiple LR, robust LR, elastic net, LASSO, ridge, partial least squares (PLS)
 # - Simulates data with correlated predictors + continuous outcome
 # - Tests all key assumptions for each method
@@ -7,8 +8,9 @@
 # - Includes run_linear_pipeline() wrapper
 #-------------------------------------------------------------------------------
 
-#--------------------------------------------
-## Step 1: Setup
+#----------------------------------------------------------------
+#### Step 1: Setup ####
+
 rm(list = ls())
 set.seed(123)
 
@@ -21,8 +23,8 @@ if(any(is_installed == FALSE)){
 }
 invisible(lapply(required_pkgs, library, character.only = TRUE))
 
-#--------------------------------------------
-## Step 2: Simulating data
+#----------------------------------------------------------------
+#### Step 2: Simulating data ####
 
 n<-500
 p<-15 # predictors
@@ -43,11 +45,11 @@ y_vec<-sim_data$y
 
 summary(y_vec)
 
-#--------------------------------------------
-## Step 3: Assumption helper function
+#----------------------------------------------------------------
+#### Step 3: Assumption helper function ####
 
 check_lm_assumptions <- function(model, label = "") {
-  cat("\n========== Assumption checks:", label, "==========\n")
+  cat("\nAssumption checks:", label, "\n")
   
   # Normality of residuals
   sw  <- shapiro.test(residuals(model))
@@ -60,28 +62,28 @@ check_lm_assumptions <- function(model, label = "") {
   bp  <- lmtest::bptest(model)
   cat("Breusch-Pagan homoscedasticity: BP =", round(bp$statistic, 4),
       "| p =", round(bp$p.value, 4))
-  if (bp$p.value < 0.05) cat(" *** HETEROSCEDASTIC ***")
+  if (bp$p.value < 0.05) cat("heteroscedastic")
   cat("\n")
   
   # Independence (Durbin-Watson)
   dw  <- lmtest::dwtest(model)
   cat("Durbin-Watson autocorrelation: DW =", round(dw$statistic, 4),
       "| p =", round(dw$p.value, 4))
-  if (dw$p.value < 0.05) cat(" *** AUTOCORRELATION ***")
+  if (dw$p.value < 0.05) cat("autocorrelation")
   cat("\n")
   
   # Multicollinearity (VIF)
   vif_res <- tryCatch(car::vif(model), error = function(e) NULL)
   if (!is.null(vif_res)) {
     cat("Max VIF:", round(max(vif_res), 3))
-    if (max(vif_res) > 5) cat(" *** HIGH MULTICOLLINEARITY (>5) ***")
+    if (max(vif_res) > 5) cat("high multicollinearity (>5)")
     cat("\n")
   }
   
   # Influential observations (Cook's distance)
   cooks  <- cooks.distance(model)
   n_infl <- sum(cooks > 4 / length(cooks))
-  cat("Influential obs (Cook's D > 4/n):", n_infl, "\n")
+  cat("Influential observation (Cook's D > 4/n):", n_infl, "\n")
   
   # Diagnostic plots
   par(mfrow = c(2, 2))
@@ -89,8 +91,8 @@ check_lm_assumptions <- function(model, label = "") {
   par(mfrow = c(1, 1))
 }
 
-#--------------------------------------------
-## Step 4: model fitting
+#----------------------------------------------------------------
+#### Step 4: model fitting ####
 
 #- - - - - -
 # Simple linear regression
@@ -274,10 +276,10 @@ ggplot(data.frame(var = names(vip_scores), vip = vip_scores),
   theme_bw(base_size = 13)
 
 
-## ============================================================
-## Comparison: cross-validated RMSE for all methods
-## ============================================================
-cat("\n\n===== MODEL COMPARISON: 10-fold CV RMSE =====\n")
+#----------------------------------------------------------------
+#### Comparison: cross-validated RMSE for all methods ####
+                      
+cat("\n\nModel comparison: 10-fold CV RMSE\n")
 
 k_folds  <- 10
 fold_idx <- caret::createFolds(y_vec, k = k_folds, list = TRUE)
@@ -311,7 +313,7 @@ comp_df <- data.frame(
   Method = c("OLS","Ridge","LASSO","Elastic Net"),
   CV_RMSE = c(rmse_ols, rmse_ridge, rmse_lasso, rmse_en)
 )
-cat("\n--- CV RMSE comparison ---\n")
+cat("\nCV RMSE comparison\n")
 print(comp_df)
 
 ggplot(comp_df, aes(x = reorder(Method, CV_RMSE), y = CV_RMSE)) +
@@ -320,8 +322,9 @@ ggplot(comp_df, aes(x = reorder(Method, CV_RMSE), y = CV_RMSE)) +
        x = "", y = "CV RMSE") +
   theme_bw(base_size = 14)
 
-#--------------------------------------------
-## Reusable pipeline
+#----------------------------------------------------------------
+#### Reusable pipeline ####
+                      
 run_linear_pipeline<-function(data, outcome_col, predictor_cols,
                                 methods = c("ols","robust","lasso","ridge","enet","pls"),
                                 nfolds  = 10, seed = 123) {
