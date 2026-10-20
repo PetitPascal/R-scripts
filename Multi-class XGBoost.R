@@ -1,5 +1,6 @@
 #-------------------------------------------------------------------------------
-## Reproducible & generalizable example: multi-class XGBoost
+## Reproducible and generalizable example: multi-class XGBoost
+#
 # - example 1: Predicting epidemic cluster (based on epidemic curves)
 # - example 2: Predicting chemical exposure cluster (based on age, BMI, physical activity)
 # - example 3: Predicting cardiovascular risk cluster (based on age, BMI, physical activity, BP, cholesterol)
@@ -9,7 +10,6 @@
 
 #----------------------------------------------------------------
 #### Configurations ####
-#----------------------------------------------------------------
 
 ## Disabling memory torture
 gctorture(FALSE)
@@ -53,7 +53,6 @@ sklearn_gp <- import("sklearn.gaussian_process")
 
 #----------------------------------------------------------------
 #### Creating two smiluated datasets ####
-#----------------------------------------------------------------
 
 #- - - - 
 ### Example 1 - epidemics
@@ -171,7 +170,6 @@ data_bp_test <- tibble(age = sample(20:70,n_test,replace=TRUE),
 
 #----------------------------------------------------------------
 #### Creating the models ####
-#----------------------------------------------------------------
 
 ## Preparing Python arrays
 
