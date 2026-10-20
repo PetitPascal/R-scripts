@@ -1,9 +1,9 @@
 #-------------------------------------------------------------------------------
-## Reproducible & generalisable G-computation script for a continuous outcome
+## Reproducible and generalizable G-computation script for a continuous outcome
 #-------------------------------------------------------------------------------
 
-#--------------------------------------------
-## Step 1: Setup
+#----------------------------------------------------------------
+#### Step 1: Setup ####
 
 rm(list=ls())
 set.seed(123)
@@ -16,8 +16,8 @@ if(any(is_installed == FALSE)){
 }
 invisible(lapply(required_pkgs, library, character.only=TRUE))
 
-#--------------------------------------------
-## Step 2: Simulating data (replace with your own)
+#----------------------------------------------------------------
+#### Step 2: Simulating data (replace with your own) ####
 
 n<-600
 K<-6
@@ -38,15 +38,15 @@ y_cont<- -1 + 0.015 * cov_df$age + 0.4 * cov_df$sex + 0.05 * cov_df$bmi + h_z + 
 sim_data<-cbind(data.frame(y=y_cont), cov_df,
                 as.data.frame(log1p(expo_df)))  # log-transform exposures
 
-#--------------------------------------------
-## Step 3: Assumption checks
+#----------------------------------------------------------------
+#### Step 3: Assumption checks ####
 
 # Correlation among exposures
 corr_expo<-cor(sim_data[, expo_names], method="spearman")
 corr_expo
 
-#--------------------------------------------
-## Step 4: Fitting ourcome model + diagnostics
+#----------------------------------------------------------------
+#### Step 4: Fitting ourcome model + diagnostics ####
 
 # Fitting outcome model
 form<-as.formula(paste("y ~", paste(c(expo_names, "age", "sex", "bmi"), collapse=" + ")))
@@ -69,8 +69,8 @@ lmtest::bptest(fit) # Checking homoscedasticity of residuals (Breusch-Pagan)
 check_heteroscedasticity(fit) # Checking homoscedasticity of residuals
 performance::check_model(fit) # checking all assumptions at once
 
-#--------------------------------------------
-## Step 5: g-computation: Q25 vs. Q75
+#----------------------------------------------------------------
+#### Step 5: g-computation: Q25 vs. Q75 ####
 
 q25<-sapply(sim_data[, expo_names], quantile, 0.25)
 q75<-sapply(sim_data[, expo_names], quantile, 0.75)
@@ -92,8 +92,8 @@ mu_hi
 diff<-mu_hi - mu_lo
 diff
 
-#--------------------------------------------
-## Step 6: Bootstrap confidence intervals
+#----------------------------------------------------------------
+#### Step 6: Bootstrap confidence intervals ####
 
 boot_fn<-function(data, idx){
   d<-data[idx, ]
@@ -114,8 +114,8 @@ ci<-boot::boot.ci(boot_res, type="perc")
 cat("\nBootstrap 95% CI for mean difference:", round(diff, 4),
     "[", round(ci$percent[4], 4), ";", round(ci$percent[5], 4), "]\n")
 
-#--------------------------------------------
-## Step 7: Visualization
+#----------------------------------------------------------------
+#### Step 7: Visualization ####
 
 # Figure 1: Bootstrap distribution
 ggplot(data.frame(diff=boot_res$t[, 1]), aes(x=diff)) +
@@ -145,8 +145,8 @@ ggplot(data.frame(quantile=q_seq, mean_y=pred_seq), aes(quantile, mean_y)) +
        x="Joint quantile of all exposures", y="Predicted mean outcome") +
   theme_bw(base_size=14)
 
-#--------------------------------------------
-## Step 8: Exposure-specific weights
+#----------------------------------------------------------------
+#### Step 8: Exposure-specific weights ####
 
 form_qgc<-as.formula(paste("y ~", paste(c(expo_names, "age", "sex", "bmi"), collapse=" + ")))
 qgc_fit<-qgcomp::qgcomp.noboot(f=form_qgc, expnms=expo_names,data=sim_data, family=gaussian(), q=4)
