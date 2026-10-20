@@ -1,16 +1,13 @@
 # ------------------------------------------------------------
 # Function: de_alpha
-# Purpose:  Convert a semi-transparent color to the equivalent
-#           opaque RGB color that would appear visually similar
-#           on a white background.
 #
-# Args:
-#   col : A color string (named color, hex, or rgba) that may 
-#         contain transparency (alpha).
-#
-# Returns:
-#   A hex color string representing the fully opaque version.
+# - purpose: convert a semi-transparent color to the equivalent opaque RGB color that would appear visually similar on a white background.
+# - argument: col : a color string (named color, hex, or rgba) that may contain transparency (alpha).
+# - returns: a hex color string representing the fully opaque version.
 # ------------------------------------------------------------
+
+#----------------------------------------------------------------
+#### Setup ####
 
 ## Installing and loading packages
 pack_needed<-c("grDevices","scales","colorspace")
@@ -20,7 +17,9 @@ if(any(is_installed == FALSE)){
 }
 invisible(lapply(pack_needed, library, character.only = TRUE))
 
-## Creating the function to remove transparency
+#----------------------------------------------------------------
+#### Creating the function to remove transparency ####
+
 de_alpha<-function(col) {
   
   # Converting to RGB with alpha (0–255)
@@ -40,9 +39,8 @@ de_alpha<-function(col) {
     blue=visual_rgb[3, ] / 255)
 }
 
-# ------------------------------------------------------------
-# Example usage
-# ------------------------------------------------------------
+#----------------------------------------------------------------
+#### Example usage ####
 
 # Defining a semi-transparent color
 transparent_col <- scales::alpha("#009E73", 0.35)
