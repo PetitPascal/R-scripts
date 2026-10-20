@@ -26,7 +26,7 @@ gctorture(FALSE)
 
 ## Installing and loading packages
 pack_needed<-c("data.table","tidyverse","survival","survminer","conflicted","kdry","broom","here","ggsurvfit","ggkm",
-               "gtsummary","GGally","cmprsk","tidycmprsk","car","rms","Hmisc","Greg","patchwork","ggstats")
+               "gtsummary","GGally","cmprsk","tidycmprsk","car","rms","Hmisc","Greg","patchwork","ggstats","qs2")
 
 is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
 if(any(is_installed == FALSE)){
@@ -267,6 +267,7 @@ lrt_results
 fwrite(cox_mod_charact,safe_path(paste0("Model_characteristics_", Sys.Date(), ".csv")),sep = ";")
 fwrite(X_time_surv_df,safe_path(paste0("Survival_at_X_time_", Sys.Date(), ".csv")),sep = ";")
 fwrite(as_tibble(data.frame(lrt_results), rownames = "term"),safe_path(paste0("LR test_", Sys.Date(), ".csv")),sep = ";")
+qs_save(cox_mod,"cox_mod.qs")
 
 #----------------------------------------------------------------
 #### Residual diagnostics ####
