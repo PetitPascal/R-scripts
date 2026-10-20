@@ -1,5 +1,6 @@
 #-------------------------------------------------------------------------------
 ## Reproducible & generalizable example: continuous multioutput XGBoost
+#
 # - example 1: Predicting epidemic parameters (beta - transmission rate, mu - recovery rate, and S0 - initial susceptible population) from simulated epidemic curves
 # - example 2: Predicting chemical concentration/exposure based on age, BMI, and physical activity level
 # - example 3: Predicting blood pressure and cholesterol based on age, BMI, and physical activity level
@@ -8,7 +9,6 @@
 
 #----------------------------------------------------------------
 #### Configurations ####
-#----------------------------------------------------------------
 
 ## Disabling memory torture
 gctorture(FALSE)
@@ -51,7 +51,6 @@ sklearn_gp <- import("sklearn.gaussian_process")
 
 #----------------------------------------------------------------
 #### Creating two smiluated datasets ####
-#----------------------------------------------------------------
 
 #- - - - 
 ### Example 1 - epidemics (SIR simulation)
@@ -173,7 +172,6 @@ data_bp_test <- tibble(id = paste0("B_test",1:10),
 
 #----------------------------------------------------------------
 #### Creating the models ####
-#----------------------------------------------------------------
 
 ## Preprocessing
 
@@ -239,7 +237,6 @@ mod3 <- py$model3$fit(X_py_mod3, Y_py_mod3) # model 3
 
 #----------------------------------------------------------------
 #### Testing the models ####
-#----------------------------------------------------------------
 
 ## Converting test data to Python
 test_mod1 <- r_to_py(as.matrix(data_test_SIR %>% select(-id))) # model 1
