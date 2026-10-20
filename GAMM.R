@@ -1,5 +1,6 @@
 #-------------------------------------------------------------------------------
-## Reproducible & Generalisable GAMM Script
+## Reproducible and generalizable GAMM script
+#
 # - Simulates longitudinal data with non-linear exposure effects
 # - Fits GAMMs with random intercepts
 # - Tests assumptions: residual normality, homoscedasticity, concurvity
@@ -7,8 +8,9 @@
 # - Includes run_gamm_pipeline() wrapper
 #-------------------------------------------------------------------------------
 
-#--------------------------------------------
-## Step 1: Setup
+#----------------------------------------------------------------
+#### Step 1: Setup ####
+
 rm(list = ls())
 set.seed(123)
 
@@ -20,8 +22,9 @@ if(any(is_installed == FALSE)){
 }
 invisible(lapply(required_pkgs, library, character.only = TRUE))
 
-#--------------------------------------------
-## Step 2: Simulating longitudinal data
+#----------------------------------------------------------------
+#### Step 2: Simulating longitudinal data ####
+
 n_id<-120
 n_time<-4
 ID<-rep(seq_len(n_id), each = n_time)
@@ -48,8 +51,8 @@ sim_long<-data.frame(id=factor(ID),
   sex=sex,
   y=y)
 
-#--------------------------------------------
-## Step 3: Assumption checks
+#----------------------------------------------------------------
+#### Step 3: Assumption checks ####
 
 # 3a. Outcome distribution
 hist(sim_long$y, main = "Outcome distribution", xlab = "y", col = "#A6DDCE")
@@ -71,8 +74,9 @@ obs_per_id<-table(sim_long$id)
 cat("Observations per subject: min =", min(obs_per_id),
     ", max =", max(obs_per_id), "\n")
 
-#--------------------------------------------
-## Step 4: Fitting GAMM
+#----------------------------------------------------------------
+#### Step 4: Fitting GAMM ####
+#
 # Using mgcv::bam for large data or gamm4::gamm4 for lme4-based random effects
 # Here: mgcv::gam with bs="re" for random intercept
 
@@ -88,8 +92,8 @@ gamm_fit<-mgcv::gam(
 summary(gamm_fit)
 broom::tidy(gamm_fit)
 
-#--------------------------------------------
-## Step 5: Assumption testing
+#----------------------------------------------------------------
+#### Step 5: Assumption testing ####
 
 # 5a. Residual diagnostics
 par(mfrow = c(2, 2))
@@ -110,8 +114,8 @@ mgcv::k.check(gamm_fit)
 lm_fit<-lm(y ~ exposure + time + age + sex, data = sim_long)
 anova(lm_fit, gamm_fit, test = "F")
 
-#--------------------------------------------
-## Step 6: Visualizing smooth effects
+#----------------------------------------------------------------
+#### Step 6: Visualizing smooth effects ####
 
 # Using gratia
 gratia::draw(gamm_fit, select = 1:2)   # exposure and time smooths
@@ -126,8 +130,9 @@ ggplot(smooth_df, aes(x = exposure, y = est)) +
        x = "Exposure", y = "s(exposure)") +
   theme_bw(base_size = 14)
 
-#--------------------------------------------
-## Step 7: Predict and plot fitted values-
+#----------------------------------------------------------------
+#### Step 7: Predict and plot fitted values ####
+
 sim_long$fitted_gamm<-fitted(gamm_fit)
 ggplot(sim_long, aes(x = fitted_gamm, y = y)) +
   geom_point(alpha = 0.3, color = "#2166ac") +
@@ -136,8 +141,9 @@ ggplot(sim_long, aes(x = fitted_gamm, y = y)) +
        x = "Fitted", y = "Observed") +
   theme_bw(base_size = 14)
 
-#--------------------------------------------
-## Step 8: Binary outcome GAMM (logistic)
+#----------------------------------------------------------------
+#### Step 8: Binary outcome GAMM (logistic) ####
+
 y_bin<-rbinom(nrow(sim_long), 1, plogis(sim_long$y / 5))
 sim_long$y_bin<-y_bin
 
@@ -154,8 +160,9 @@ summary(gamm_bin)
 broom::tidy(gamm_bin)
 mgcv::gam.check(gamm_bin)
 
-#--------------------------------------------
-## Step 9: Reusable pipeline
+#----------------------------------------------------------------
+#### Step 9: Reusable pipeline ####
+
 run_gamm_pipeline<-function(data, outcome_col, smooth_vars, linear_vars = NULL,
                               id_col = NULL, k =8, family = gaussian(),
                               method = "REML") {
