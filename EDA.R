@@ -402,31 +402,165 @@ plot_cor_matrix<-function(cm, legend_title, sig=NULL){
 }
 
 #- - - - - -
-## Saving a plot (png)
+## Saving figures (any ggplot2 object, or a list of ggplots) with automatic size
+#
+# - discrete axes: size from the number and length of labels
+# - continuous axes: panel_width x panel_height (cm)
+# - facets with free space keep their relative sizes
+# - fixed-ratio coordinates (coord_fixed, coord_sf) keep their aspect ratio
+# - in patchwork, widths/heights are the sizes of the panel areas only: the final size is therefore read on the assembled figure (axes, titles, legends and strips included)
+# - a patchwork object cannot be measured: width/height are used (default 25 x 18 cm)
+# - legend_position = NULL keeps the legend of each plot; with several plots, legends are collected
 
-#- - - - - -
-## Saving a plot (png) with a size computed from its content
-
-save_plot<-function(plot, name, width=NULL, height=NULL, panel_w=12, panel_h=8, cm_per_x=1.2, cm_per_y=1, matrix_cell=5,
-                    margin_w=4, margin_h=3, width_max=30, height_max=60, dpi=300){
-  if(is.null(width) | is.null(height)){
-    if(inherits(plot, "ggmatrix")){
-      w_auto<-plot$ncol * matrix_cell + margin_w
-      h_auto<-plot$nrow * matrix_cell + margin_h
-    }else{
-      b<-ggplot2::ggplot_build(plot)
-      lay<-b$layout$layout
-      pp<-b$layout$panel_params[[1]]
-      n_x<-tryCatch(length(pp$x$get_labels()), error=function(e) 0)
-      n_y<-tryCatch(length(pp$y$get_labels()), error=function(e) 0)
-      w_auto<-max(lay$COL) * max(panel_w, n_x * cm_per_x) + margin_w
-      h_auto<-max(lay$ROW) * max(panel_h, n_y * cm_per_y) + margin_h
-    }
-    if(is.null(width)) width<-min(w_auto, width_max)
-    if(is.null(height)) height<-min(h_auto, height_max)
+save_plot<-function(plot, name, ncol=1, dpi=300, ext="png", panel_width=9, panel_height=7, legend_position=NULL, margin=0.5, width=NULL, height=NULL){
+  plots<-if(inherits(plot, "ggplot")) list(plot) else plot
+  ncol<-min(ncol, length(plots))
+  nrow_p<-ceiling(length(plots)/ncol)
+  file<-paste0(name, "_", Sys.Date(), ".", ext)
+  
+  # null device: needed by grid to measure text, without creating a file
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add=TRUE)
+  
+  # width (cm) of the widest text of a vector
+  text_cm<-function(x, fontsize){
+    x<-as.character(x[!is.na(x)])
+    if(length(x)==0) return(0)
+    grid::convertWidth(grid::grobWidth(grid::textGrob(x, gp=grid::gpar(fontsize=fontsize))), "cm", valueOnly=TRUE)
   }
-  ggsave(plot=plot, filename=paste(name, "_", Sys.Date(), ".png", sep=""), width=width, height=height, units="cm", dpi=dpi, bg="white", limitsize=FALSE)
-  message("Figure saved: ", name, "_", Sys.Date(), ".png (", round(width, 1), " x ", round(height, 1), " cm)")
+  # value of a theme element of the plot (e.g., font size of the axis text)
+  theme_el<-function(p, el, field, default){
+    th<-tryCatch(ggplot2::theme_get() + p$theme, error=function(e) ggplot2::theme_get())
+    v<-tryCatch(ggplot2::calc_element(el, th)[[field]], error=function(e) NULL)
+    if(is.null(v) || length(v)==0 || is.na(v[1])) default else v
+  }
+  
+  # size (cm) of the panel area of one plot
+  panel_dims<-function(p){
+    b<-ggplot2::ggplot_build(p)
+    g<-ggplot2::ggplotGrob(p)
+    lay<-b$layout$layout
+    pan<-g$layout[grepl("^panel", g$layout$name), ]
+    cols<-sort(unique(pan$l)) # columns and rows of the gtable occupied by panels
+    rows<-sort(unique(pan$t))
+    
+    # with coord_flip, the x scale is drawn vertically
+    flipped<-inherits(p$coordinates, "CoordFlip")
+    h_ax<-if(flipped) "y" else "x"
+    v_ax<-if(flipped) "x" else "y"
+    sc_h<-b$layout[[paste0("panel_scales_", h_ax)]]
+    sc_v<-b$layout[[paste0("panel_scales_", v_ax)]]
+    idx_h<-lay[[paste0("SCALE_", toupper(h_ax))]]
+    idx_v<-lay[[paste0("SCALE_", toupper(v_ax))]]
+    
+    # text layers (labels need room)
+    cls<-sapply(p$layers, function(l) class(l$geom)[1])
+    is_txt<-grepl("Text|Label", cls)
+    txt<-if(any(is_txt)) as.character(unlist(lapply(b$data[which(is_txt)], function(d) d$label))) else character(0)
+    has_txt<-length(txt)>0
+    
+    fs_x<-theme_el(p, "axis.text.x", "size", 11)
+    fs_y<-theme_el(p, "axis.text.y", "size", 11)
+    ang_x<-theme_el(p, "axis.text.x", "angle", 0)
+    lab_of<-function(s) tryCatch(as.character(s$get_labels()), error=function(e) as.character(s$get_limits()))
+    pt_cm<-0.03528 # 1 point in cm
+    
+    # horizontal size of one panel: discrete = one slot per label (width of the longest label, or narrow if rotated); continuous = panel_width
+    size_h<-function(s){
+      if(s$is_discrete()){
+        lab<-lab_of(s)
+        fs<-if(flipped) fs_y else fs_x
+        per<-if(!flipped && ang_x>=45) max(0.9, fs * pt_cm * 1.8) else max(0.9, text_cm(lab, fs) + 0.5)
+        max(4, length(lab) * per)
+      }else{
+        max(panel_width, if(has_txt) 3 * text_cm(txt, 11) else 0)
+      }
+    }
+    # vertical size of one panel: discrete = one slot per label (height of its lines); continuous = panel_height
+    size_v<-function(s){
+      if(s$is_discrete()){
+        lab<-lab_of(s)
+        fs<-if(flipped) fs_x else fs_y
+        n_l<-stringr::str_count(lab, "\n") + 1
+        per<-pmax(if(has_txt) 1.1 else 0.8, n_l * fs * pt_cm * 1.25 + 0.35)
+        max(3, sum(per))
+      }else{
+        panel_height
+      }
+    }
+    w<-sapply(seq_len(max(lay$COL)), function(i) max(sapply(unique(idx_h[lay$COL==i]), function(k) size_h(sc_h[[k]]))))
+    h<-sapply(seq_len(max(lay$ROW)), function(i) max(sapply(unique(idx_v[lay$ROW==i]), function(k) size_v(sc_v[[k]]))))
+    if(length(cols)!=length(w)) w<-rep(max(w), length(cols))
+    if(length(rows)!=length(h)) h<-rep(max(h), length(rows))
+    
+    # facets with free space (unequal null units) keep their relative sizes, otherwise all panels are equal
+    keep_prop<-function(sizes, units){
+      nul<-tryCatch(as.numeric(units), error=function(e) rep(1, length(units)))
+      if(length(nul)>1 && diff(range(nul))>1e-8) nul/max(nul) * max(sizes) else rep(max(sizes), length(sizes))
+    }
+    w<-keep_prop(w, g$widths[cols])
+    h<-keep_prop(h, g$heights[rows])
+    
+    # fixed aspect ratio (coord_fixed, coord_sf...): the height follows the width
+    free<-tryCatch(p$coordinates$is_free(), error=function(e) TRUE)
+    if(!free){
+      asp<-tryCatch(sum(as.numeric(g$heights[rows]))/sum(as.numeric(g$widths[cols])), error=function(e) 1)
+      w<-rep(panel_width/length(w), length(w))
+      h<-rep(sum(w) * asp/length(h), length(h))
+      if(sum(h)>2 * panel_height){
+        h<-h * 2 * panel_height/sum(h)
+        w<-w * (sum(h)/asp)/sum(w)
+      }
+    }
+    
+    # size of the whole panel area (panels + spacing between facets)
+    g$widths[cols]<-grid::unit(w, "cm")
+    g$heights[rows]<-grid::unit(h, "cm")
+    c(w=sum(grid::convertWidth(g$widths[min(cols):max(cols)], "cm", valueOnly=TRUE)),
+      h=sum(grid::convertHeight(g$heights[min(rows):max(rows)], "cm", valueOnly=TRUE)))
+  }
+  
+  if(any(sapply(plots, inherits, what="patchwork"))){
+    message("A patchwork object cannot be measured: width/height used (default 25 x 18 cm)")
+    fig<-if(length(plots)==1) plots[[1]] else patchwork::wrap_plots(plots, ncol=ncol)
+    if(is.null(width)) width<-25
+    if(is.null(height)) height<-18
+  }else{
+    # panel area of each column and each row of plots = largest of its plots
+    sizes<-lapply(plots, panel_dims)
+    idx<-matrix(seq_len(nrow_p * ncol), nrow=nrow_p, ncol=ncol, byrow=TRUE)
+    w_col<-sapply(seq_len(ncol), function(j) max(sapply(idx[, j][idx[, j]<=length(plots)], function(k) sizes[[k]][["w"]])))
+    h_row<-sapply(seq_len(nrow_p), function(i) max(sapply(idx[i, ][idx[i, ]<=length(plots)], function(k) sizes[[k]][["h"]])))
+    # one single legend: kept on the first plot only (all plots of a figure must share the same color scale), removed from the others
+    if(!is.null(legend_position)){
+      plots<-lapply(seq_along(plots), function(k) plots[[k]] + ggplot2::theme(legend.position=if(k==1) legend_position else "none"))
+    }
+    # legend on top of everything (above the titles of the first row): a dedicated first row is reserved for the collected legend
+    top_legend<-identical(legend_position, "top") && length(plots)>1
+    if(top_legend){
+      # height of the legend (cm), measured on the first plot
+      leg_h<-tryCatch({
+        gl<-ggplot2::ggplotGrob(plots[[1]] + ggplot2::theme(legend.position="top"))
+        top_panel<-min(gl$layout$t[grepl("^panel", gl$layout$name)])
+        i<-which(grepl("guide-box", gl$layout$name) & gl$layout$t<top_panel)
+        if(length(i)==0) 1.5 else sum(grid::convertHeight(gl$heights[unique(gl$layout$t[i])], "cm", valueOnly=TRUE))
+      }, error=function(e) 1.5)
+      # row 1 = area of the collected legend (all columns), then one area per plot (filled row by row)
+      areas<-Reduce(c, c(list(patchwork::area(1, 1, 1, ncol)),
+                         lapply(seq_along(plots), function(k) patchwork::area((k - 1) %/% ncol + 2, (k - 1) %% ncol + 1))))
+      fig<-patchwork::wrap_plots(c(list(patchwork::guide_area()), plots), design=areas, widths=grid::unit(w_col, "cm"),
+                                 heights=grid::unit(c(leg_h, h_row), "cm"), guides="collect")
+    }else{
+      fig<-patchwork::wrap_plots(plots, ncol=ncol, widths=grid::unit(w_col, "cm"), heights=grid::unit(h_row, "cm"), guides=if(length(plots)>1) "collect" else "keep")
+    }
+    # total size = size of the assembled figure (+2% and a margin)
+    gt<-patchwork::patchworkGrob(fig)
+    if(is.null(width)) width<-sum(grid::convertWidth(gt$widths, "cm", valueOnly=TRUE)) * 1.02 + margin
+    if(is.null(height)) height<-sum(grid::convertHeight(gt$heights, "cm", valueOnly=TRUE)) * 1.02 + margin
+  }
+  ggplot2::ggsave(plot=fig, filename=file, width=width, height=height, units="cm", dpi=dpi, bg="white", limitsize=FALSE)
+  message("Figure saved: ", file, " (", round(width, 1), " x ", round(height, 1), " cm)")
+  invisible(c(width=width, height=height))
 }
 
 #- - - - - -
