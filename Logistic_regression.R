@@ -1,6 +1,7 @@
 #-------------------------------------------------------------------------------
-## Reproducible & Generalisable Logistic Regression Script
-# Covers:
+## Reproducible and generalizable Logistic Regression script
+#
+# covers:
 #   - Simple binary logistic regression
 #   - Multiple binary logistic regression
 #   - Assumption testing (overdispersion, separation, multicollinearity, influential observations, Hosmer-Lemeshow, ROC/AUC)
@@ -9,8 +10,9 @@
 #   - Reusable pipeline functions
 #-------------------------------------------------------------------------------
 
-#--------------------------------------------
-## Step 1: Setup
+#----------------------------------------------------------------
+#### Step 1: Setup ####
+
 rm(list = ls())
 set.seed(123)
 
@@ -30,8 +32,8 @@ conflicted::conflict_prefer("filter", "dplyr")
 conflicted::conflict_prefer("tidy","broom")
 conflicted::conflicts_prefer(stats::predict)
 
-#--------------------------------------------
-## Step 2: Simulating dataset
+#----------------------------------------------------------------
+#### Step 2: Simulating dataset ####
 
 n<-600
 age<-round(rnorm(n, 50, 12))
@@ -69,16 +71,16 @@ sim_data <- tibble(id=seq_len(n),
   exposure=exposure,
   job=job)
 
+#----------------------------------------------------------------
+#### Step 3: EDA ####
 
-#--------------------------------------------
-## Step 3: EDA
 sim_data %>%
   gtsummary::tbl_summary(by= disease,include = c(age, sex, bmi, smoking, exposure, job)) %>%
   gtsummary::add_p() %>%
   gtsummary::bold_labels()
 
-#--------------------------------------------
-## Simple binary logistic regression
+#----------------------------------------------------------------
+#### Simple binary logistic regression ####
 
 # Fitting the model
 mod_simple<-glm(disease ~ exposure,data   = sim_data,family = binomial(link = "logit"))
@@ -122,8 +124,8 @@ mod_simple %>%
   gtsummary::tbl_regression(intercept = TRUE, exponentiate = TRUE) %>%
   gtsummary::bold_p()
 
-#--------------------------------------------
-## Multiple binary logistic regression
+#----------------------------------------------------------------
+#### Multiple binary logistic regression ####
 
 #- - - - 
 ## Model fitting
@@ -318,8 +320,8 @@ high_infl <- infl_df %>% filter(cooks > 4 / nrow(sim_data))
 cat("\nHighly influential observations (Cook > 4/n):", nrow(high_infl), "\n")
 if (nrow(high_infl) > 0) print(head(high_infl))
 
-#--------------------------------------------
-## Ordinal logistic regression
+#----------------------------------------------------------------
+#### Ordinal logistic regression ####
 
 ## Model fitting
 mod_ord <- ordinal::clm(disease_sev ~ exposure + age + bmi + smoking,
@@ -415,8 +417,8 @@ lrt_ord
 cat("AIC — Null:", round(AIC(mod_ord_null), 2),
     "| Full:", round(AIC(mod_ord), 2), "\n")
 
-#--------------------------------------------
-## Reusable pipeline functions
+#----------------------------------------------------------------
+#### Reusable pipeline functions ####
 
 ## Binary logistic pipeline
 run_logistic_pipeline <- function(data, outcome_col, predictor_cols,
