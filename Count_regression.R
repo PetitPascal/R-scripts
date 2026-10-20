@@ -11,8 +11,9 @@
 #   - reusable pipeline function
 #-------------------------------------------------------------------------------
 
-#--------------------------------------------
-## Step 1: Setup
+#----------------------------------------------------------------
+#### Step 1: Setup ####
+
 rm(list = ls())
 set.seed(123)
 
@@ -31,8 +32,9 @@ conflicted::conflict_prefer("filter", "dplyr")
 conflicted::conflict_prefer("tidy","broom")
 conflicted::conflicts_prefer(stats::predict)
 
-#--------------------------------------------
-## Step 2: Simulate datasets
+#----------------------------------------------------------------
+#### Step 2: Simulating datasets ####
+
 n<-500
 
 # Predictors
@@ -67,8 +69,8 @@ sim_data<-tibble(y_pois= y_pois,
   exposure=exposure,
   country=country)
 
-#--------------------------------------------
-## Step 3: EDA
+#----------------------------------------------------------------
+#### Step 3: EDA ####
 
 # Distribution of count outcomes
 par(mfrow = c(1,2))
@@ -88,8 +90,8 @@ ggplot(dist_check, aes(x = value, fill = distribution)) +
   scale_fill_manual(values = c("#2166ac","#d6604d")) +
   theme_bw(base_size = 14)
 
-#--------------------------------------------
-## Simple Poisson regression
+#----------------------------------------------------------------
+#### Simple Poisson regression ####
 
 mod_pois_simple<-glm(y_pois ~ exposure,
                        data=sim_data,
@@ -109,8 +111,8 @@ ggplot(sim_data, aes(x = exposure, y = y_pois)) +
        x = "Exposure", y = "Count") +
   theme_bw(base_size = 14)
 
-#--------------------------------------------
-## Multiple Poisson regression
+#----------------------------------------------------------------
+#### Multiple Poisson regression ####
 
 # Fitting model
 mod_pois<-glm(y_pois ~ exposure + age + sex + bmi + smoking,
@@ -225,8 +227,8 @@ plot(ggeffects::ggeffect(mod_pois, terms = "exposure")) +
 plot(ggeffects::ggeffect(mod_pois, terms = c("exposure","smoking"))) +
   labs(title = "Predicted count: exposure × smoking")
 
-#--------------------------------------------
-## Quasi Poisson regression - use when deviance/df > 1.5 (overdispersion present)
+#----------------------------------------------------------------
+#### Quasi Poisson regression - use when deviance/df > 1.5 (overdispersion present) ####
 
 mod_quasi<-glm(y_nb ~ exposure + age + sex + bmi + smoking,
                  data= sim_data,
@@ -239,8 +241,8 @@ car::Anova(mod_quasi, test = "F")
 # IRR
 broom::tidy(mod_quasi, conf.int = TRUE, exponentiate = TRUE)
 
-#--------------------------------------------
-## Negative binomial regression: better than quasi Poisson when variance >> mean (count data)
+#----------------------------------------------------------------
+#### Negative binomial regression: better than quasi Poisson when variance >> mean (count data) ####
 
 mod_nb<-MASS::glm.nb(y_nb ~ exposure + age + sex + bmi + smoking,data = sim_data)
 summary(mod_nb)
