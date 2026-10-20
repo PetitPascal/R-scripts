@@ -1,14 +1,15 @@
 #-------------------------------------------------------------------------------
-## Restricted Cubic Spline (RCS) pipeline — reproducible & generalisable
+## Reproducible and generalizable Restricted Cubic Spline (RCS) pipeline
+#
 # - Simulates data (correlated exposures, covariates, outcome)
 # - Fits RCS using rms::lrm (binary) or rms::ols (continuous)
 # - Produces spline plot with CIs, tests for nonlinearity, saves outputs
 # - Includes run_rcs_pipeline() to apply to your own dataset
 #-------------------------------------------------------------------------------
 
-## -------------------------
-## Step 1 - Setup
-## -------------------------
+#----------------------------------------------------------------
+#### Step 1 - Setup ####
+
 rm(list = ls())
 set.seed(123)
 
@@ -23,9 +24,9 @@ invisible(lapply(required_pkgs, library, character.only = TRUE))
 # Creating a helper for safe file paths
 safe_filepath <- function(fname) file.path(getwd(), fname)
 
-## -------------------------
-## Step 2 - Simulating example data
-## -------------------------
+#----------------------------------------------------------------
+#### Step 2 - Simulating example data ####
+
 n <- 800
 p_expo <- 6
 
@@ -63,15 +64,15 @@ example_df <- bind_cols(
 
 head(example_df)
 
-## -------------------------
-## Step 3 - Utility: pretty plot theme
-## -------------------------
+#----------------------------------------------------------------
+#### Step 3 - Utility: pretty plot theme ####
+
 theme_rcs <- function() theme_minimal(base_size = 13) +
   theme(panel.grid.minor = element_blank())
 
-## -------------------------
-## Step 4 - Core function: running one RCS model and plot
-## -------------------------
+#----------------------------------------------------------------
+#### Step 4 - Core function: running one RCS model and plot ####
+#
 # Parameters:
 # - data: data.frame
 # - outcome: name of outcome column (string)
@@ -140,16 +141,17 @@ run_rcs_one <- function(data, outcome, exposure, covariates = NULL,
 }
 
 
-## -------------------------
-## Step 5 - Higher-level wrapper: run_rcs_pipeline. Looping over exposures and saving outputs
-## -------------------------
-# data: data.frame
-# outcome: name of outcome
-# exposures: character vector of exposures to analyze
-# covariates: covariates to adjust for
-# family: "binomial" or "gaussian"
-# nk: either a single integer (knots) or numeric vector of knot locations (for rms)
-# out_prefix: file prefix
+#----------------------------------------------------------------
+#### Step 5 - Higher-level wrapper: run_rcs_pipeline. Looping over exposures and saving outputs ####
+#
+# - data: data.frame
+# - outcome: name of outcome
+# - exposures: character vector of exposures to analyze
+# - covariates: covariates to adjust for
+# - family: "binomial" or "gaussian"
+# - nk: either a single integer (knots) or numeric vector of knot locations (for rms)
+# - out_prefix: file prefix
+
 run_rcs_pipeline <- function(data, outcome, exposures, covariates = NULL,
                              family = c("binomial", "gaussian"), nk = 4,
                              ref_pct = 0.25, out_prefix = "rcs_out", nsim = 200) {
@@ -170,9 +172,9 @@ run_rcs_pipeline <- function(data, outcome, exposures, covariates = NULL,
   return(results)
 }
 
-## -------------------------
-## Step 6 - Example runs on simulated data
-## -------------------------
+#----------------------------------------------------------------
+#### Step 6 - Example runs on simulated data ####
+
 # Logistic (binary) outcome with exposure env_A
 run_rcs_one(
   data = example_df,
