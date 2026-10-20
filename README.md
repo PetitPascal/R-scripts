@@ -158,7 +158,7 @@ Performs a linear mixed-effect model, robust linear mixed-effect model, one-way 
 
 Performs a generalized additive mixed model analysis.
 
-•	*multinomial_regression.R*
+•	*Multinomial_regression.R*
 
 Performs a multinomial regression analysis.
 
@@ -186,7 +186,7 @@ Initial attempt to estimate energy consumption and carbon emissions from running
 
 Creates random assignments for experiments (e.g., clinical trial).
 
-•	*gmean.R*
+•	*Gmean.R*
 
 Function computing the geometric mean of a numeric vector.
 
