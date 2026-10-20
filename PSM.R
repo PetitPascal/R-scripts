@@ -1,13 +1,14 @@
 #-------------------------------------------------------------------------------
-## Reproducible & generalisable propensity score matching (PSM) analysis pipeline
+## Reproducible and generalizable propensity score matching (PSM) analysis pipeline
+#
 # - Uses MatchIt + cobalt + tableone for matching & diagnostics
 # - Example uses 'lalonde' dataset (available in MatchIt)
 # - Replace df_example and function arguments to run on your own data
 #-------------------------------------------------------------------------------
 
-## -------------------------
-## Step 1 - Setup
-## -------------------------
+#----------------------------------------------------------------
+#### Step 1 - Setup ####
+
 required_pkgs <- c("MatchIt", "cobalt", "tableone", "dplyr", "ggplot2", "gridExtra", "openxlsx")
 
 is_installed<-required_pkgs %in% rownames(installed.packages(all.available=TRUE))
@@ -18,9 +19,8 @@ invisible(lapply(required_pkgs, library, character.only = TRUE))
 
 set.seed(123)
 
-## -------------------------
-## Step 2 - Using example dataset Lalonde available in MatchIt
-## -------------------------
+#----------------------------------------------------------------
+#### Step 2 - Using example dataset Lalonde available in MatchIt ####
 
 data("lalonde", package = "MatchIt")
 
@@ -35,9 +35,9 @@ df_example <- lalonde %>%
     treat_flag=treat)
 
 
-## -------------------------
-## Step 3 - Creating a helper function: check data, calculate SMDs and produce balance tables/plots
-## -------------------------
+#----------------------------------------------------------------
+#### Step 3 - Creating a helper function: check data, calculate SMDs and produce balance tables/plots ####
+
 psm_preflight <- function(df, treat_col, covs) {
   if (!treat_col %in% names(df)) stop("treatment column not found.")
   if (any(is.na(df[, treat_col]))) stop("NA in treatment column.")
@@ -65,17 +65,17 @@ smd_table <- function(mobj, covs, treat = "treat_flag", threshold = 0.1) {
   return(list(bal.tab = btab, smd = sumtab))
 }
 
-## -------------------------
-## Step 4 - Main runner: run_psm_pipeline()
-## -------------------------
-# df: data.frame
-# treat: name of treatment column (0/1)
-# covariates: character vector of covariate names used to estimate PS
-# method: "nearest", "optimal", "full", "genetic"
-# ratio: matching ratio (1 = 1:1)
-# caliper: caliper on the logit of PS (set NULL to skip)
-# caliper_sensitivity: a numeric vector of calipers to test (optional)
-# seed: RNG seed for reproducibility
+#----------------------------------------------------------------
+#### Step 4 - Main runner: run_psm_pipeline() ####
+#
+# - df: data.frame
+# - treat: name of treatment column (0/1)
+# - covariates: character vector of covariate names used to estimate PS
+# - method: "nearest", "optimal", "full", "genetic"
+# - ratio: matching ratio (1 = 1:1)
+# - caliper: caliper on the logit of PS (set NULL to skip)
+# - caliper_sensitivity: a numeric vector of calipers to test (optional)
+# - seed: RNG seed for reproducibility
 
 run_psm_pipeline <- function(df, treat, covariates,
                              method = "nearest", ratio = 1, caliper = 0.2,
@@ -181,6 +181,7 @@ run_psm_pipeline <- function(df, treat, covariates,
   }
   
   # Step 9 - Optional: estimating treatment effect on outcome (simple example)
+                               #
   # Logistic regression of outcome ~ treat on matched sample (if outcome exists)
   # You can replace "outcome_name" with your outcome variable
   # Example: if 're78' exists in lalonde it will be used as outcome
@@ -189,9 +190,9 @@ run_psm_pipeline <- function(df, treat, covariates,
   return(psm_report)
 }
 
-## -------------------------
-## Step 5 - Running example
-## -------------------------
+#----------------------------------------------------------------
+#### Step 5 - Running example ####
+                               
 # Choose covariates (avoid re-using the original script's variable names)
 covariate_list <- c("age_yrs", "educ_years", "race", "married_flag",
                     "no_degree", "inc_1974", "inc_1975", "inc_1978")
@@ -208,9 +209,9 @@ psm_out_example <- run_psm_pipeline(
   save_prefix = "lalonde_psm"
 )
 
-## -------------------------
-## Step 6 - How to use on your own data
-## -------------------------
+#----------------------------------------------------------------
+#### Step 6 - How to use on your own data ####
+#
 # Replace df_example with your own data frame (for example readxl::read_excel or openxlsx::read.xlsx)
 # Example:
 # df_user <- openxlsx::read.xlsx("path/your_file.xlsx", sheet = 1)
