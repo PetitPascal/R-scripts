@@ -5,7 +5,7 @@
 gctorture(FALSE)
 
 ## Installing and loading packages
-pack_needed<-c("data.table","tidyverse","tibble","broom","rstanarm","BayesFactor","bayestestR","glmnet",
+pack_needed<-c("data.table","tidyverse","tibble","broom","rstanarm","BayesFactor","bayestestR","glmnet","qs2",
                "BMA","loo","bayesboot","grid","gridExtra","conflicted","usdm","fmsb","RColorBrewer","patchwork","here")
 
 is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
@@ -92,6 +92,7 @@ summary(bayes2)
 
 ## Saving the model
 saveRDS(bayes2, file = "BMA_model.rds")
+qs_save(bayes2,paste0("BMA_model_",Sys.Date(),".qs"))
 
 ## Table with determinants identified
 
