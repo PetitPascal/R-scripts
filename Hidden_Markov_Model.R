@@ -1,12 +1,14 @@
 #-------------------------------------------------------------------------------
-## Reproducible & Generalisable Hidden Markov Model (HMM) Script
+## Reproducible and generalisable Hidden Markov Model (HMM) script
+#
 # - Simulates longitudinal data with latent state switching
 # - Fits HMM (continuous/categorical observations)
 # - Tests assumptions: Viterbi decoding, state classification, BIC selection
 #-------------------------------------------------------------------------------
 
-#--------------------------------------------
-## Step 1: Setup ----
+#----------------------------------------------------------------
+#### Step 1: Setup ####
+
 rm(list = ls())
 set.seed(123)
 
@@ -18,10 +20,11 @@ if(any(is_installed == FALSE)){
 }
 invisible(lapply(required_pkgs, library, character.only = TRUE))
 
-#--------------------------------------------
-## Step 2: Simulating HMM data
-# 2 latent states: "low" and "high" activity
-# State-dependent observation: continuous variable (e.g. step count)
+#----------------------------------------------------------------
+#### Step 2: Simulating HMM data ####
+# - 2 latent states: "low" and "high" activity
+# - state-dependent observation: continuous variable (e.g. step count)
+
 n_subj<-80
 n_obs<-12   # observations per subject (e.g. monthly)
 N<-n_subj * n_obs
@@ -55,8 +58,8 @@ sim_hmm<-data.frame(subject=factor(subj_all),
   y=pmax(obs_all, 0),    # non-negative
   true_state=states_all)
 
-#--------------------------------------------
-## Step 3: Assumption / EDA checks
+#----------------------------------------------------------------
+#### Step 3: Assumption / EDA checks ####
 
 # 3a. Distribution of observations
 ggplot(sim_hmm, aes(x = y)) +
@@ -77,9 +80,11 @@ sim_hmm %>% filter(subject %in% levels(subject)[1:5]) %>%
        x = "Time", y = "y") +
   theme_bw() + theme(legend.position = "bottom")
 
-#--------------------------------------------
-## Step 4: Fitting HMM
+#----------------------------------------------------------------
+#### Step 4: Fitting HMM ####
+#
 # ntimes: vector of observation lengths per subject
+
 ntimes_vec<-rep(n_obs, n_subj)
 
 # Model with 2 hidden states, Gaussian response
@@ -92,8 +97,9 @@ hmm_2<-depmixS4::depmix(response=y ~ 1,# response model: mean per state
 fit_2<-depmixS4::fit(hmm_2, verbose = FALSE)
 summary(fit_2)
 
-#--------------------------------------------
-## Step 5: Model selection — BIC across different numbers of states
+#----------------------------------------------------------------
+#### Step 5: Model selection — BIC across different numbers of states ####
+
 bic_vals<-sapply(1:4, function(k) {
   m<-depmixS4::depmix(y ~ 1, data = sim_hmm, nstates = k,
                         ntimes = ntimes_vec, family = gaussian())
@@ -116,15 +122,17 @@ ggplot(bic_df, aes(x = n_states, y = BIC)) +
 best_k<-bic_df$n_states[which.min(bic_df$BIC)]
 cat("\nBIC-selected number of states:", best_k, "\n")
 
-#--------------------------------------------
-## Step 6: Fitting best model
+#----------------------------------------------------------------
+#### Step 6: Fitting best model ####
+  
 hmm_best<-depmixS4::depmix(y ~ 1, data = sim_hmm, nstates = best_k,
                              ntimes = ntimes_vec, family = gaussian())
 fit_best<-depmixS4::fit(hmm_best, verbose = FALSE)
 summary(fit_best)
 
-#--------------------------------------------
-## Step 7: Viterbi decoding (i.e., most likely state sequence)
+#----------------------------------------------------------------
+#### Step 7: Viterbi decoding (i.e., most likely state sequence) ####
+  
 viterbi_states <-depmixS4::viterbi(fit_best)
 sim_hmm$decoded<-viterbi_states$state
 
@@ -139,8 +147,9 @@ if (best_k == 2) {
               sum(conf_mat), 3), "\n")
 }
 
-#--------------------------------------------
-## Step 8: Posterior state probabilities ----
+#----------------------------------------------------------------
+#### Step 8: Posterior state probabilities ####
+  
 post_probs   <-depmixS4::posterior(fit_best)
 sim_hmm$p_s1 <-post_probs[, 2]   # P(state 1)
 sim_hmm$p_s2 <-if (best_k >= 2) post_probs[, 3] else NA
@@ -158,8 +167,9 @@ sim_hmm %>%
   scale_color_brewer(palette = "Set1") +
   theme_bw(base_size = 13)
 
-#--------------------------------------------
-## Step 9: Extracting transition and emission parameters
+#----------------------------------------------------------------
+#### Step 9: Extracting transition and emission parameters ####
+  
 cat("\nTransition matrix\n")
 # Extracting from fitted model
 trans_mat<-matrix(getpars(fit_best)[seq_len(best_k^2)], nrow = best_k, byrow = TRUE)
@@ -173,8 +183,8 @@ n_trans  <-best_k + best_k * best_k   # initial + transition params
 emis_part<-emit_pars[(n_trans + 1):length(emit_pars)]
 cat(round(emis_part, 3), "\n")
 
-#--------------------------------------------
-## Step 10: Assumption checks
+#----------------------------------------------------------------
+#### Step 10: Assumption checks ####
 
 # 10a. Residuals within state (should be roughly normal)
 for (k in seq_len(best_k)) {
@@ -193,9 +203,11 @@ if (any(state_prev < 0.05))
 # 10c. Autocorrelation of residuals (should be low within decoded state)
 acf(r, main = "ACF of HMM residuals", lag.max = 20)
 
-#--------------------------------------------
-## Step 11: Covariate-dependent transition probabilities
+#----------------------------------------------------------------
+#### Step 11: Covariate-dependent transition probabilities ####
+#
 # Example: transition probabilities depend on age (time-constant covariate)
+  
 sim_hmm_cov<-sim_hmm
 sim_hmm_cov$age_sc<-scale(rep(rnorm(n_subj, 50, 10), each = n_obs))
 
@@ -217,8 +229,9 @@ if (!is.null(fit_cov)) {
       " | BIC (with age):", BIC(fit_cov), "\n")
 }
 
-# #--------------------------------------------
-# ## Step 12: Reusable pipeline
+# #----------------------------------------------------------------
+# #### Step 12: Reusable pipeline ####
+#
 # run_hmm_pipeline<-function(data, outcome_col, subject_col, time_col,
 #                              n_states_max = 4, family = gaussian(),
 #                              covariate_cols = NULL, seed = 2025) {
