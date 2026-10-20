@@ -1,6 +1,7 @@
 #-------------------------------------------------------------------------------
-## Reproducible and generalisable clustering analysis script
-# Covers:
+## Reproducible and generalizable clustering analysis script
+#
+# covers:
 #   - Data simulation and preprocessing
 #   - Optimal cluster number: elbow, silhouette, gap statistic, NbClust
 #   - K-means clustering
@@ -19,8 +20,8 @@
 #   - Reusable pipeline function
 #-------------------------------------------------------------------------------
 
-#--------------------------------------------
-### Step 1: Setup
+#----------------------------------------------------------------
+#### Setup ####
 
 rm(list=ls())
 set.seed(123)
@@ -34,8 +35,8 @@ if(any(is_installed==FALSE)){
 }
 invisible(lapply(required_pkgs, library, character.only=TRUE))
 
-#--------------------------------------------
-### Step 2: Simulating multi-cluster dataset
+#----------------------------------------------------------------
+#### Simulating multi-cluster dataset ####
 
 # Creating 4 separated clusters in 8-dimensional space to mimic an omics or environmental mixture dataset
 n_per<-120
@@ -59,8 +60,8 @@ sim_df$true_k<-factor(true_labels)
 # Scaling features (essential for most clustering methods)
 X_scaled<-scale(sim_df[, paste0("V", 1:8)])
 
-#--------------------------------------------
-### Step 3: EDA
+#----------------------------------------------------------------
+#### EDA ####
 
 # Correlation matrix of features
 corrplot::corrplot(cor(X_scaled), method="color",title="", mar=c(0,0,1,0))
@@ -76,8 +77,8 @@ ggplot(pca_df, aes(x=PC1, y=PC2, color=true_k)) +
        color="True cluster") +
   theme_bw(base_size=14)
 
-#--------------------------------------------
-### Determining the optimal number of clusters
+#----------------------------------------------------------------
+#### Determining the optimal number of clusters ####
 
 # Approach 1 - elbow method (within-cluster sum of squares)
 factoextra::fviz_nbclust(X_scaled, FUNcluster=kmeans,method="wss", k.max=10) +
@@ -127,8 +128,8 @@ opt_df<-data.frame(K=2:10, WSS=wss_vals, Silhouette=sil_vals)
 cat("\nElbow/Silhouette table\n")
 round(opt_df, 4)
 
-#--------------------------------------------
-### k-means clustering
+#----------------------------------------------------------------
+#### k-means clustering ####
 
 K_sel<-cluster::maxSE(gap_stat$Tab[,"gap"],gap_stat$Tab[,"SE.sim"],method="Tibs2001SEmax")   # set based on optimal K selection above
 
@@ -155,8 +156,8 @@ fviz_cluster(km_fit, data=X_scaled,
 km_ari<-mclust::adjustedRandIndex(km_fit$cluster, true_labels)
 cat("K-means Adjusted Rand Index (ARI) vs. true labels:", round(km_ari, 4), "\n")
 
-#--------------------------------------------
-### Hierachical clustering
+#----------------------------------------------------------------
+#### Hierachical clustering ####
 
 dist_mat<-dist(X_scaled, method="euclidean")
 
@@ -191,8 +192,8 @@ diana_fit<-cluster::diana(X_scaled, metric="euclidean")
 diana_lab<-cutree(as.hclust(diana_fit), k=K_sel)
 cat("DIANA average silhouette:",round(mean(cluster::silhouette(diana_lab, dist_mat)[,3]), 4), "\n")
 
-#--------------------------------------------
-### Soft / fuzzy clustering
+#----------------------------------------------------------------
+#### Soft / fuzzy clustering ####
 
 # fuzzy C-means
 fcm_fit<-e1071::cmeans(X_scaled, centers=K_sel,
@@ -232,8 +233,8 @@ ggplot(pca_fcm, aes(x=PC1, y=PC2,color=hard_cluster, size=max_memb)) +
   labs(title="Fuzzy C-means: PCA plot (size=certainty)", color="Cluster") +
   theme_bw(base_size=14)
 
-#--------------------------------------------
-### Model-based clustering
+#----------------------------------------------------------------
+#### Model-based clustering ####
 
 mclust_fit<-mclust::Mclust(X_scaled, G=K_sel)
 
@@ -257,8 +258,8 @@ hist(mclust_uncertainty, main="mclust: classification uncertainty",
 cat("\nPosterior probabilities (first 6 obs)\n")
 round(head(mclust_fit$z), 3)
 
-#--------------------------------------------
-### Semi-supervized model-based clustering
+#----------------------------------------------------------------
+#### Semi-supervized model-based clustering ####
 
 # Scenario: 20% of observations have known labels; rest are unlabelled
 
@@ -275,9 +276,8 @@ cat("Compare: unsupervised ARI =",round(mclust::adjustedRandIndex(mclust_fit$cla
 
 plot(ss_fit, what="classification",main="Semi-supervised mclust: classification")
 
-#--------------------------------------------
-### Flexmix (mixture of regression / latent class models): fits mixture models where each component 
-### has its own regression. It is useful when clusters differ in predictor-outcome relationships
+#----------------------------------------------------------------
+#### Flexmix (mixture of regression / latent class models): fits mixture models where each component has its own regression. It is useful when clusters differ in predictor-outcome relationships ####
 
 # Creating a response variable for illustration
 flex_df<-as.data.frame(X_scaled)
@@ -313,8 +313,8 @@ flex_bic<-sapply(2:6, function(k) {
 cat("\n-FlexMix BIC by K\n")
 data.frame(K=2:6, BIC=round(flex_bic, 2))
 
-#--------------------------------------------
-### Latent class analysis (LCA): for categorical/binary indicator variables
+#----------------------------------------------------------------
+#### Latent class analysis (LCA): for categorical/binary indicator variables ####
 
 # Simulating binary/ordinal indicators for LCA, with 3 true latent classes and 8 binary items
 n_lca<-500
@@ -418,8 +418,8 @@ ggplot(lca_probs_df, aes(x=item, y=prob, fill=class)) +
   theme_bw(base_size=13) +
   theme(axis.text.x=element_text(angle=45,hjust=1))
 
-#--------------------------------------------
-### Mixture model with within-class dependencies
+#----------------------------------------------------------------
+#### Mixture model with within-class dependencies ####
 
 ## Gaussian mixture with full within-class covariance
 
@@ -451,11 +451,11 @@ if(!is.null(mclust_full)){
   cat("Best model:", best_mod$modelName, "\n")
 }
 
-#--------------------------------------------
-### DBSCAN (density-based; no K required)
-
-# Advantages: finds arbitrary shapes, handles noise/outliers
-# Key parameters: eps (neighbourhood radius), minPts (min neighbours)
+#----------------------------------------------------------------
+#### DBSCAN (density-based; no K required) ####
+#
+# - Advantages: finds arbitrary shapes, handles noise/outliers
+# - Key parameters: eps (neighbourhood radius), minPts (min neighbours)
 
 # Estimating eps via k-nearest neighbour distance plot
 dbscan::kNNdistplot(X_scaled, k=5)
@@ -483,8 +483,8 @@ ggplot(pca_db, aes(x=PC1, y=PC2, color=cluster)) +
   labs(title="DBSCAN: cluster assignments (grey=noise)",color="Cluster") +
   theme_bw(base_size=14)
 
-#--------------------------------------------
-### Special clustering: for non-convex clusters -> uses graph Laplacian eigen decomposition
+#----------------------------------------------------------------
+#### Special clustering: for non-convex clusters -> uses graph Laplacian eigen decomposition ####
 
 spec_fit<-kernlab::specc(X_scaled, centers=K_sel)
 spec_lab<-as.integer(spec_fit)
@@ -494,9 +494,10 @@ spec_sil<-cluster::silhouette(spec_lab, dist_mat)
 cat("Spectral average silhouette:", round(mean(spec_sil[,3]), 4), "\n")
 cat("Adjusted Rand Index (ARI) vs. true labels:",round(mclust::adjustedRandIndex(spec_lab, true_labels), 4), "\n")
 
-#--------------------------------------------
-### UMAP: non-linear dimensionality reduction preserving local structure
-# Not a clustering method itself, but used to visualize cluster structure
+#----------------------------------------------------------------
+#### UMAP: non-linear dimensionality reduction preserving local structure ####
+#
+# Note: not a clustering method itself, but used to visualize cluster structure
 
 set.seed(123)
 umap_config<-umap::umap.defaults
@@ -539,8 +540,8 @@ ggplot(umap_df, aes(x=UMAP1, y=UMAP2,color=factor(fcm_fit$cluster), size=max_mem
   labs(title="UMAP: fuzzy C-means membership certainty",color="Cluster", size="Max membership") +
   theme_bw(base_size=14)
 
-#--------------------------------------------
-### t-SNE (comparison with UMAP)
+#----------------------------------------------------------------
+#### t-SNE (comparison with UMAP) ####
 
 set.seed(123)
 tsne_fit<-Rtsne::Rtsne(X_scaled, dims=2, perplexity=30,check_duplicates=FALSE, verbose=FALSE)
@@ -553,8 +554,8 @@ ggplot(tsne_df, aes(x=tSNE1, y=tSNE2, color=true_k)) +
   labs(title="t-SNE: true cluster structure", color="True K") +
   theme_bw(base_size=14)
 
-#--------------------------------------------
-### Cluster validation and comparison
+#----------------------------------------------------------------
+#### Cluster validation and comparison ####
 
 # Collecting all hard assignments
 all_labels<-data.frame(true=true_labels,
@@ -591,8 +592,8 @@ ggplot(sil_df, aes(x=reorder(method, avg_sil), y=avg_sil)) +
   labs(title="Cluster validation: average silhouette by method",x="", y="Average silhouette width") +
   theme_bw(base_size=14)
 
-#--------------------------------------------
-### Cluster characterization
+#----------------------------------------------------------------
+#### Cluster characterization ####
 
 best_labels<-km_fit$cluster # replace with your best method
 char_df<-as.data.frame(X_scaled)
@@ -630,8 +631,8 @@ anova_res<-sapply(paste0("V",1:8), function(v) {
 cat("\nNOVA p-values: feature differences across clusters\n")
 sort(anova_res)
 
-#--------------------------------------------
-### Reusable pipeline
+#----------------------------------------------------------------
+#### Reusable pipeline ####
 
 run_clustering_pipeline<-function(data, K=NULL, K_max=10, scale_data=TRUE,
                                   methods=c("kmeans","hclust","mclust","fuzzy"),
