@@ -1,5 +1,6 @@
 #-------------------------------------------------------------------------------
-## Reproducible & Generalisable Linear Mixed-Effect Model (LMM) Script
+## Reproducible and generalisable Linear Mixed-Effect Model (LMM) script
+#
 # Covers: LMM, robust LMM, one-way mixed ANOVA, two-way mixed ANOVA
 # - Uses simulated RCT-style longitudinal dataset
 # - Tests assumptions: normality, homoscedasticity, random effect structure
@@ -7,8 +8,9 @@
 # - Includes run_lmm_pipeline() wrapper
 #-------------------------------------------------------------------------------
 
-#--------------------------------------------
-## Step 1: Setup
+#----------------------------------------------------------------
+#### Step 1: Setup ####
+
 rm(list = ls())
 set.seed(123)
 
@@ -26,8 +28,9 @@ conflicted::conflict_prefer("select", "dplyr")
 conflicted::conflict_prefer("filter", "dplyr")
 conflicted::conflicts_prefer(lme4::lmer)
 
-#--------------------------------------------
-## Step 2: Simulating longitudinal repeated data
+#----------------------------------------------------------------
+#### Step 2: Simulating longitudinal repeated data ####
+
 n_id<-180
 n_time<-4
 arms<-c("A","B")
@@ -61,8 +64,8 @@ dat$time<-factor(dat$time, levels = 0:3,
 
 df <- dplyr::as_tibble(dat)
 
-#--------------------------------------------
-## Step 3: EDA
+#----------------------------------------------------------------
+#### Step 3: EDA ####
 
 df %>%
   group_by(arm, time) %>%
@@ -74,8 +77,8 @@ df %>%
        x="Time", y="Mean outcome") +
   theme_bw(base_size=14)
 
-#--------------------------------------------
-## Step 4 - Model fitting
+#----------------------------------------------------------------
+#### Step 4 - Model fitting ####
 
 #- - - -
 ## Model 1 - One-Way Mixed ANOVA (between-subject factor: arm/group; within-subject factor: time)
@@ -182,8 +185,9 @@ ggplot(emm_plot_df, aes(x=time, y=emmean, color=arm, group=arm,
 rlmm_fit<-robustlmm::rlmer(y ~ arm * time + age + (1 | ID),data = df)
 summary(rlmm_fit)
 
-#--------------------------------------------
-## Step 5 - Model comparison
+#----------------------------------------------------------------
+#### Step 5 - Model comparison ####
+
 lmm_null<-lmerTest::lmer(y ~ time + age + (1|ID), data=df, REML=FALSE)
 lrt<-anova(lmm_null, lmm_full)
 lrt
@@ -191,8 +195,9 @@ lrt
 cat("\nAIC comparison:\n")
 cat("Null:", round(AIC(lmm_null),2), "| Full:", round(AIC(lmm_full),2), "\n")
 
-#--------------------------------------------
-## Step 6 - Reusable pipeline
+#----------------------------------------------------------------
+#### Step 6 - Reusable pipeline ####
+
 run_lmm_pipeline<-function(data, outcome_col, fixed_effects,
                              random_intercept = "ID",
                              random_slope= NULL,
