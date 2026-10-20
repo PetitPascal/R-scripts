@@ -2,19 +2,41 @@
 # Purpose: Load a saved model and use it to make predictions
 # ------------------------------------------------------------
 
-#---------------------------------------------------------
-## 1. Loading the saved model
+#----------------------------------------------------------------
+#### Configurations ####
 
+## Disabling memory torture
+gctorture(FALSE)
+
+## Installing and loading packages
+pack_needed<-c("tidyverse","xgboost","qs2")
+
+is_installed<-pack_needed %in% rownames(installed.packages(all.available=TRUE))
+if(any(is_installed == FALSE)){
+  install.packages(pack_needed[!is_installed],repos = "http://cran.us.r-project.org")
+}
+invisible(lapply(pack_needed, library, character.only = TRUE))
+
+#----------------------------------------------------------------
+#### 1. Loading the saved model ####
+
+# RDS
 loaded_model <- readRDS("example_model.rds")
 
-#---------------------------------------------------------
-## 2. Preparing new data for prediction
+# # QS2
+# loaded_model <- qd_read("example_model.qs2")
+
+# # xgboost
+# loaded_model <- xgb.load("example_model.ubj")
+
+#----------------------------------------------------------------
+#### 2. Preparing new data for prediction ####
 
 # Replace this with your own new / unseen data
 new_data <- data.frame(x1 = c(0.1, 0.5), x2 = c(-1.2, 0.3))
 
-#---------------------------------------------------------
-## 3. Making predictions 
+#----------------------------------------------------------------
+#### 3. Making predictions ####
 
 # Some models (e.g., xgboost) require a matrix, others (glm, randomForest, caret) require a data frame.
 if (inherits(loaded_model, "xgb.Booster")) {
