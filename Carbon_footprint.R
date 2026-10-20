@@ -9,7 +9,7 @@
 #  - ram_watts_per_GiB = 0.3725 (W per GiB)
 #  - carbon_fallback_gpkwh = 475 (g CO2 / kWh) -global fallback if regional API fails
 #
-# NOTE: This script uses only free endpoints (UK National Grid) and local heuristics.
+# Note: This script uses only free endpoints (e.g., UK National Grid) and local heuristics.
 #----------------------------------------------------------------
 
 
