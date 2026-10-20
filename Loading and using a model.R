@@ -21,7 +21,7 @@ invisible(lapply(pack_needed, library, character.only = TRUE))
 #### 1. Loading the saved model ####
 
 # RDS
-loaded_model <- readRDS("example_model.rds") # dependent of the package version, better solution below
+loaded_model <- readRDS("Example_model.rds") # dependent of the package version, better solution below
 
 # # QS2
 # loaded_model <- qd_read("example_model.qs2")
