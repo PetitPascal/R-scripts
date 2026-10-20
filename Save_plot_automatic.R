@@ -37,23 +37,28 @@ here::here("Figure export")
 #- - - - - -
 ## Saving figures (any ggplot2 object, or a list of ggplots) with automatic size
 #
-# - discrete axes: size from the number and length of labels
+# - ext: one or several formats, e.g. c("png","pdf","tiff"), with one file per format (name_<date>.<ext>)
+# - compression: TIFF compression (e.g., "lzw"); only used for tiff files
+# - discrete axes: size from the number and length of labels, and from the text written inside the tiles (geom_text/geom_label)
 # - continuous axes: panel_width x panel_height (cm)
-# - facets with free space keep their relative sizes
-# - fixed-ratio coordinates (coord_fixed, coord_sf) keep their aspect ratio
-# - in patchwork, widths/heights are the sizes of the panel areas only: the final size is therefore read on the assembled figure (axes, titles, legends and strips included)
-# - a patchwork object cannot be measured: width/height are used (default 25 x 18 cm)
-# - legend_position = NULL keeps the legend of each plot; with several plots, legends are collected
+# - facets with free space keep their relative sizes; fixed-ratio coordinates (coord_fixed, coord_sf) keep their aspect ratio
+# - several plots: one single legend, placed at legend_position ("top" = above all plots)
+# - a patchwork object cannot be measured: width/height are used (default 25 x 18 cm), pass width= and height= (cm) to change them
+# - ...: other arguments passed to ggplot2::ggsave
 
-save_plot<-function(plot, name, ncol=1, dpi=300, ext="png", panel_width=9, panel_height=7, legend_position=NULL, margin=0.5, width=NULL, height=NULL, ...){
+save_plot<-function(plot, name, ncol=1, dpi=300, ext="png", panel_width=9, panel_height=7, legend_position=NULL, margin=0.5,
+                    width=NULL, height=NULL, compression="lzw", ...){
   plots<-if(inherits(plot, "ggplot")) list(plot) else plot
   ncol<-min(ncol, length(plots))
   nrow_p<-ceiling(length(plots)/ncol)
+  ext<-unique(tolower(ext))
   files<-paste0(name, "_", Sys.Date(), ".", ext) # one file per format
   
   # null device: needed by grid to measure text, without creating a file
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add=TRUE)
+  
+  pt_cm<-0.03528 # 1 point in cm
   
   # width (cm) of the widest text of a vector
   text_cm<-function(x, fontsize){
@@ -86,36 +91,43 @@ save_plot<-function(plot, name, ncol=1, dpi=300, ext="png", panel_width=9, panel
     idx_h<-lay[[paste0("SCALE_", toupper(h_ax))]]
     idx_v<-lay[[paste0("SCALE_", toupper(v_ax))]]
     
-    # text layers (labels need room)
+    # text layers (all labels need room, including repelled ones)
     cls<-sapply(p$layers, function(l) class(l$geom)[1])
     is_txt<-grepl("Text|Label", cls)
     txt<-if(any(is_txt)) as.character(unlist(lapply(b$data[which(is_txt)], function(d) d$label))) else character(0)
     has_txt<-length(txt)>0
     
+    # text written INSIDE the tiles (plain geom_text / geom_label, not repelled): slots of discrete axes must be large enough to contain it
+    is_tile<-cls %in% c("GeomText","GeomLabel")
+    tile_txt<-if(any(is_tile)) as.character(unlist(lapply(b$data[which(is_tile)], function(d) d$label))) else character(0)
+    tile_txt<-tile_txt[!is.na(tile_txt) & tile_txt!=""]
+    tile_fs<-if(any(is_tile)) max(unlist(lapply(b$data[which(is_tile)], function(d) if("size" %in% names(d)) d$size else 3.88)), na.rm=TRUE) * ggplot2::.pt else 11
+    tile_w<-if(length(tile_txt)>0) text_cm(unlist(strsplit(tile_txt, "\n", fixed=TRUE)), tile_fs) + 0.4 else 0 # widest line (cm)
+    tile_h<-if(length(tile_txt)>0) (max(stringr::str_count(tile_txt, "\n")) + 1) * tile_fs * pt_cm * 1.3 + 0.3 else 0 # tallest text (cm)
+    
     fs_x<-theme_el(p, "axis.text.x", "size", 11)
     fs_y<-theme_el(p, "axis.text.y", "size", 11)
     ang_x<-theme_el(p, "axis.text.x", "angle", 0)
     lab_of<-function(s) tryCatch(as.character(s$get_labels()), error=function(e) as.character(s$get_limits()))
-    pt_cm<-0.03528 # 1 point in cm
     
-    # horizontal size of one panel: discrete = one slot per label (width of the longest label, or narrow if rotated); continuous = panel_width
+    # horizontal size of one panel: discrete = one slot per label (widest of: label, text inside the tile); continuous = panel_width
     size_h<-function(s){
       if(s$is_discrete()){
         lab<-lab_of(s)
         fs<-if(flipped) fs_y else fs_x
         per<-if(!flipped && ang_x>=45) max(0.9, fs * pt_cm * 1.8) else max(0.9, text_cm(lab, fs) + 0.5)
-        max(4, length(lab) * per)
+        max(4, length(lab) * max(per, tile_w))
       }else{
         max(panel_width, if(has_txt) 3 * text_cm(txt, 11) else 0)
       }
     }
-    # vertical size of one panel: discrete = one slot per label (height of its lines); continuous = panel_height
+    # vertical size of one panel: discrete = one slot per label (height of its lines, or of the text inside the tile); continuous = panel_height
     size_v<-function(s){
       if(s$is_discrete()){
         lab<-lab_of(s)
         fs<-if(flipped) fs_x else fs_y
         n_l<-stringr::str_count(lab, "\n") + 1
-        per<-pmax(if(has_txt) 1.1 else 0.8, n_l * fs * pt_cm * 1.25 + 0.35)
+        per<-pmax(if(has_txt) 1.1 else 0.8, n_l * fs * pt_cm * 1.25 + 0.35, tile_h)
         max(3, sum(per))
       }else{
         panel_height
@@ -154,8 +166,9 @@ save_plot<-function(plot, name, ncol=1, dpi=300, ext="png", panel_width=9, panel
   }
   
   if(any(sapply(plots, inherits, what="patchwork"))){
-    message("A patchwork object cannot be measured: width/height used (default 25 x 18 cm)")
-    fig<-if(length(plots)==1) plots[[1]] else patchwork::wrap_plots(plots, ncol=ncol)
+    message("A patchwork object cannot be measured: width/height used (default 25 x 18 cm); use width= and height= (cm) to change them")
+    fig<-if(length(plots)==1) plots[[1]] else patchwork::wrap_plots(plots, ncol=ncol, guides="collect")
+    if(!is.null(legend_position)) fig<-fig & ggplot2::theme(legend.position=legend_position)
     if(is.null(width)) width<-25
     if(is.null(height)) height<-18
   }else{
@@ -191,9 +204,16 @@ save_plot<-function(plot, name, ncol=1, dpi=300, ext="png", panel_width=9, panel
     if(is.null(width)) width<-sum(grid::convertWidth(gt$widths, "cm", valueOnly=TRUE)) * 1.02 + margin
     if(is.null(height)) height<-sum(grid::convertHeight(gt$heights, "cm", valueOnly=TRUE)) * 1.02 + margin
   }
-  for(f in files){
-    ggplot2::ggsave(plot=fig, filename=f, width=width, height=height, units="cm", dpi=dpi, bg="white", limitsize=FALSE, ...)
-    message("Figure saved: ", f, " (", round(width, 1), " x ", round(height, 1), " cm)")
+  
+  # one file per format; compression is only passed to tiff devices
+  for(k in seq_along(files)){
+    args<-c(list(plot=fig, filename=files[k], width=width, height=height, units="cm", dpi=dpi, bg="white", limitsize=FALSE), list(...))
+    if(ext[k] %in% c("tiff","tif")){
+      args$compression<-compression
+      args$device<-if(requireNamespace("ragg", quietly=TRUE)) ragg::agg_tiff else "tiff"
+    }
+    do.call(ggplot2::ggsave, args)
+    message("Figure saved: ", files[k], " (", round(width, 1), " x ", round(height, 1), " cm)")
   }
   invisible(c(width=width, height=height))
 }
