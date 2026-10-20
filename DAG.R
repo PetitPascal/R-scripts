@@ -1,5 +1,6 @@
 #-------------------------------------------------------------------------------
-## Reproducible & Generalisable DAG Script
+## Reproducible & generalizable DAG script
+#
 # - Builds and visualises DAGs
 # - Identifies adjustment sets, backdoor paths, instruments
 # - Tests DAG implications against data (d-separation tests)
@@ -7,8 +8,9 @@
 # - Includes a flexible build_dag() helper
 #-------------------------------------------------------------------------------
 
-#--------------------------------------------
-## Step 1: Setup
+#----------------------------------------------------------------
+#### Step 1: Setup ####
+
 rm(list = ls())
 set.seed(123)
 
@@ -19,8 +21,8 @@ if(any(is_installed == FALSE)){
 }
 invisible(lapply(required_pkgs, library, character.only = TRUE))
 
-#--------------------------------------------
-## Step 2: Defining DAG
+#----------------------------------------------------------------
+#### Step 2: Defining DAG ####
 
 # Example: environmental epidemiology
 # Exposure (E) -> Outcome (Y)
@@ -47,8 +49,8 @@ dag1<-dagitty::dagitty('dag {
   Y -> K
 }')
 
-#--------------------------------------------
-## Step 3: Visualizing DAG
+#----------------------------------------------------------------
+#### Step 3: Visualizing DAG ####
 
 ggdag::ggdag(dag1, layout = "nicely") +
   ggdag::theme_dag() +
@@ -59,8 +61,8 @@ ggdag::ggdag_paths(dag1, from = "E", to = "Y") +
   ggdag::theme_dag() +
   labs(title = "All paths from E to Y")
 
-#--------------------------------------------
-## Step 4: Identifying adjustment sets
+#----------------------------------------------------------------
+#### Step 4: Identifying adjustment sets ####
 
 cat("\nMinimal adjustment sets (to estimate total E -> Y effect)\n")
 dagitty::adjustmentSets(dag1, exposure = "E", outcome = "Y", type = "minimal")
@@ -71,14 +73,15 @@ dagitty::adjustmentSets(dag1, exposure = "E", outcome = "Y", type = "all")
 cat("\nAdjustment sets for DIRECT effect (E -> Y, blocking M)\n")
 dagitty::adjustmentSets(dag1, exposure = "E", outcome = "Y",effect = "direct", type = "minimal")
 
-#--------------------------------------------
-## Step 5: Identifying instrumental variables
+#----------------------------------------------------------------
+#### Step 5: Identifying instrumental variables ####
 
 cat("\nInstrumental variables for E -> Y\n")
 dagitty::instrumentalVariables(dag1, exposure = "E", outcome = "Y")
 
-#--------------------------------------------
-## Step 6: Identifying colliders and backdoor paths ----
+#----------------------------------------------------------------
+#### Step 6: Identifying colliders and backdoor paths ####
+
 cat("\nBackdoor paths from E to Y\n")
 dagitty::paths(dag1, from = "E", to = "Y", directed = FALSE)
 
@@ -91,8 +94,8 @@ ggdag::ggdag_adjustment_set(dag1, exposure = "E", outcome = "Y",shadow = TRUE) +
   ggdag::theme_dag() +
   labs(title = "Sufficient adjustment sets (shaded = must adjust)")
 
-#--------------------------------------------
-## Step 7: Simulating data
+#----------------------------------------------------------------
+#### Step 7: Simulating data ####
 
 n<-1000
 C<-rnorm(n)
@@ -104,8 +107,8 @@ K<-0.3*E + 0.3*Y + rnorm(n)   # collider
 
 dag_data<-data.frame(Z=Z, C=C, E=E, M=M, K=K, Y=Y)
 
-#--------------------------------------------
-## Step 8: Demonstrating confounding and proper adjustment
+#----------------------------------------------------------------
+#### Step 8: Demonstrating confounding and proper adjustment ####
 
 # Unadjusted (biased — ignores C)
 fit_unadj<-lm(Y ~ E, data = dag_data)
@@ -131,8 +134,8 @@ fit_collider <- lm(Y ~ E + C + K, data = dag_data)
 cat("\nCollider bias (+ K, incorrect): biased estimate\n")
 coef(fit_collider)["E"]
 
-#--------------------------------------------
-## Step 9: Testing DAG implications (d-separation tests)
+#----------------------------------------------------------------
+#### Step 9: Testing DAG implications (d-separation tests) ####
 
 # Conditional independence claims implied by the DAG
 cat("\nImplied conditional independencies\n")
@@ -146,10 +149,11 @@ test_res <- dagitty::localTests(dag1, data = dag_data, type = "cis")
 round(test_res, 3)
 cat("p < 0.05 = evidence against that independence claim (potential DAG mis-specification)\n")
 
-#--------------------------------------------
-## Step 10: Mediation analysis via DAG-guided approach
-# Total effect = direct + indirect (through M)
-# Using difference-in-coefficients method
+#----------------------------------------------------------------
+#### Step 10: Mediation analysis via DAG-guided approach ####
+#
+# - Total effect = direct + indirect (through M)
+# - Using difference-in-coefficients method
 
 total_eff<-coef(fit_adj)["E"]
 direct_eff<-coef(fit_over)["E"]
@@ -160,8 +164,9 @@ cat("Direct effect:  ", round(direct_eff, 4), "\n")
 cat("Indirect (via M):", round(indirect,  4), "\n")
 cat("Proportion mediated:", round(indirect / total_eff * 100, 1), "%\n")
 
-#--------------------------------------------
-## Step 11: More complex DAG — time-varying confounding
+#----------------------------------------------------------------
+#### Step 11: More complex DAG — time-varying confounding ####
+
 dag_tv<-dagitty::dagitty('dag {
   L0 [pos="0,0"]
   A0 [pos="1,0" exposure]
@@ -185,8 +190,8 @@ ggdag::ggdag(dag_tv, layout = "nicely") +
 cat("\nAdjustment sets for A0+A1 -> Y (time-varying)\n")
 dagitty::adjustmentSets(dag_tv, exposure = c("A0","A1"),outcome = "Y", type = "minimal")
 
-#--------------------------------------------
-## Step 12: Reusable DAG helper
+#----------------------------------------------------------------
+#### Step 12: Reusable DAG helper ####
 
 build_dag<-function(dag_string, exposure, outcome,data = NULL, plot = TRUE){
   dag<-dagitty::dagitty(dag_string)
