@@ -1,13 +1,15 @@
 #-------------------------------------------------------------------------------
-## Reproducible & Generalisable DLNM Script
+## Reproducible & generalizable DLNM script
+#
 # - Simulates time-series exposure-response data with lagged effects
 # - Fits DLNM
 # - Tests assumptions: residual autocorrelation, overdispersion, model fit
 # - Visualises 3D and 2D exposure-lag-response surfaces
 #-------------------------------------------------------------------------------
 
-#--------------------------------------------
-## Step 1: Setup
+#----------------------------------------------------------------
+#### Step 1: Setup ####
+
 rm(list = ls())
 set.seed(123)
 
@@ -19,8 +21,9 @@ if(any(is_installed == FALSE)){
 }
 invisible(lapply(required_pkgs, library, character.only = TRUE))
 
-#--------------------------------------------
-## Step 2: Simulating daily time-series data
+#----------------------------------------------------------------
+#### Step 2: Simulating daily time-series data ####
+
 n_days<-730 # 2 years of daily data
 
 # Time index
@@ -71,8 +74,8 @@ ts_data<-ts_data[(max_lag + 1):n_days, ]
 temp_trimmed<-temp[(max_lag + 1):n_days]
 cat("Time series length after trimming:", nrow(ts_data), "days\n")
 
-#--------------------------------------------
-## Step 3: Assumption / EDA checks
+#----------------------------------------------------------------
+#### Step 3: Assumption / EDA checks ####
 
 # 3a. Outcome distribution
 summary(ts_data$y)
@@ -97,9 +100,9 @@ cat("\nADF test (stationarity of exposure):",
     "statistic =", round(adf_res$statistic, 3),
     "| p =", round(adf_res$p.value, 4), "\n")
 
-#--------------------------------------------
-## Step 4: Building cross-basis matrix (DLNM)
-
+#----------------------------------------------------------------
+#### Step 4: Building cross-basis matrix (DLNM) ####
+#
 # Cross-basis combining:
 #   - exposure-response function (argvar): natural spline in exposure
 #   - lag-response function (arglag): natural spline over lags
@@ -111,8 +114,8 @@ cb_temp <- dlnm::crossbasis(ts_data$temp,
 
 cat("\nCross-basis dimensions:", dim(cb_temp), "\n")
 
-#--------------------------------------------
-## Step 5: Fitting DLNM model
+#----------------------------------------------------------------
+#### Step 5: Fitting DLNM model ####
 
 # Poisson GLM with cross-basis + confounders
 # Spline for long-term trend (time) to control seasonality
@@ -125,8 +128,8 @@ dlnm_fit<-glm(y ~ cb_temp +
 
 summary(dlnm_fit)$coefficients[1:5, ]
 
-#--------------------------------------------
-## Step 6: Assumption checks on fitted model
+#----------------------------------------------------------------
+#### Step 6: Assumption checks on fitted model ####
 
 # 6a. Overdispersion (quasipoisson dispersion parameter)
 disp_param<-summary(dlnm_fit)$dispersion
@@ -151,8 +154,8 @@ plot(fitted(dlnm_fit), residuals(dlnm_fit, type = "deviance"),
      main = "Residuals vs Fitted (DLNM)")
 abline(h = 0, lty = 2, col = "red")
 
-#--------------------------------------------
-## Step 7: Predicting exposure-lag-response surface
+#----------------------------------------------------------------
+#### Step 7: Predicting exposure-lag-response surface ####
 
 # Reference: median temperature
 ref_temp<-median(ts_data$temp)
@@ -163,8 +166,8 @@ pred_dlnm <- dlnm::crosspred(basis=cb_temp,
   cen=ref_temp,
   cumul=TRUE) # also compute cumulative effects
 
-#--------------------------------------------
-## Step 8: Visualizing results
+#----------------------------------------------------------------
+#### Step 8: Visualizing results ####
 
 # 8a. 3D surface plot
 plot(pred_dlnm, xlab = "Temperature (°C)", zlab = "RR",
@@ -196,8 +199,9 @@ ggplot(cum_df, aes(x = temp, y = rr, ymin = lo, ymax = hi)) +
        x = "Temperature (°C)", y = "Cumulative RR (95% CI)") +
   theme_bw(base_size = 14)
 
-#--------------------------------------------
-## Step 9: Lag-specific effects at selected temperatures
+#----------------------------------------------------------------
+#### Step 9: Lag-specific effects at selected temperatures ####
+
 cold_temp<-quantile(ts_data$temp, 0.05)
 hot_temp<-quantile(ts_data$temp, 0.95)
 
