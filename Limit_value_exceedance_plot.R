@@ -1,6 +1,5 @@
 #------------------------------------------------------------------
-#### Configurations  ####
-#------------------------------------------------------------------
+#### Configurations ####
 
 ## Installing and loading packages
 pack_needed<-c("tidyverse","scales","datasets")
@@ -12,8 +11,7 @@ if(any(is_installed == FALSE)){
 invisible(lapply(pack_needed, library, character.only = TRUE))
 
 #------------------------------------------------------------------
-#### Data preparation  ####
-#------------------------------------------------------------------
+#### Data preparation ####
 
 ## Using the airquality dataset from the datasets package as example
 test<-as_tibble(na.omit(datasets::airquality))
@@ -28,8 +26,7 @@ test<-test %>% group_by(Month) %>% summarize(median=median(Ozone),      # median
                                              P99=quantile(Ozone, 0.99)) # 99th percentile
 
 #------------------------------------------------------------------
-#### Limit value exceedance assessment  ####
-#------------------------------------------------------------------
+#### Limit value exceedance assessment ####
 
 ## Setting a limit value for ozone concentration
 limit_value<-75
@@ -44,8 +41,7 @@ test<-test %>% mutate(comp=case_when(P95>limit_value~"Yes",
 test$comp<-factor(test$comp,levels=unique(test$comp))
 
 #------------------------------------------------------------------
-#### Plot  ####
-#------------------------------------------------------------------
+#### Plot ####
 
 test %>% ggplot() +   
   geom_point(aes(x=Month,y=median),size=2) +
