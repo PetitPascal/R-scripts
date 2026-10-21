@@ -12,7 +12,9 @@ if(any(is_installed == FALSE)){
 invisible(lapply(pack_needed, library, character.only = TRUE))
 
 ## Setting work directory
-here::here("Randomization scheme")
+out_dir<-here::here("Randomization scheme")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
 
 #------------------------------------------------------------------
 #### Creating a randomized  ####
