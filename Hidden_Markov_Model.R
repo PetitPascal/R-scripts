@@ -20,6 +20,10 @@ if(any(is_installed == FALSE)){
 }
 invisible(lapply(required_pkgs, library, character.only = TRUE))
 
+out_dir<-here::here("Hidden Markov Model analysis")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
+
 #----------------------------------------------------------------
 #### Step 2: Simulating HMM data ####
 # - 2 latent states: "low" and "high" activity
