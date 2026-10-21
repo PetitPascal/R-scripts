@@ -1,5 +1,5 @@
 #-------------------------------------------------------------------------------
-## Reproducible & generalizable example: continuous multioutput XGBoost
+## Reproducible and generalizable example: continuous multioutput XGBoost
 #
 # - example 1: Predicting epidemic parameters (beta - transmission rate, mu - recovery rate, and S0 - initial susceptible population) from simulated epidemic curves
 # - example 2: Predicting chemical concentration/exposure based on age, BMI, and physical activity level
@@ -23,7 +23,9 @@ if(any(is_installed == FALSE)){
 invisible(lapply(pack_needed, library, character.only = TRUE))
 
 ## Setting the working directory
-here::here("XGBoost - multi-output")
+out_dir<-here::here("XGBoost - multi-output")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
 
 ## Creating the conda 'r-reticulate' environment if it does not exist (to allow Python use with R)
 if (!"r-reticulate" %in% conda_list()$name) {
