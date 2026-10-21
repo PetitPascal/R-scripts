@@ -40,7 +40,9 @@ conflict_prefer("slice","dplyr")
 
 ## Setting the working directory
 
-here::here("Data management")
+out_dir<-here::here("Data management")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
 
 ## Setting seed
 
