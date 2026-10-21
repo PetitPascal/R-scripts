@@ -42,7 +42,9 @@ conflict_prefer("slice","dplyr")
 
 ## Setting the working directory
 
-here::here("Exploratory data analysis")
+out_dir<-here::here("Exploratory data analysis")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
 
 ## Setting seed
 
