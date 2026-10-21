@@ -26,7 +26,9 @@ conflict_prefer("lme4","lmer")
 conflicted::conflicts_prefer(lme4::lmer)
 
 ## Setting work directory
-here::here("RCT analysis")
+out_dir<-here::here("RCT analysis")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
 
 #------------------------------------------------------------------
 #### Data import ####
