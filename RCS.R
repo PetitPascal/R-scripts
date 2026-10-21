@@ -21,6 +21,11 @@ if(any(is_installed == FALSE)){
 }
 invisible(lapply(required_pkgs, library, character.only = TRUE))
 
+# Setting the working directory (tables and figures are written here)
+out_dir<-here::here("RCS analysis")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
+
 # Creating a helper for safe file paths
 safe_filepath <- function(fname) file.path(getwd(), fname)
 
