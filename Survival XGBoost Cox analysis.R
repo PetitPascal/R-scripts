@@ -25,7 +25,9 @@ conflict_prefer("slice", "dplyr")
 conflict_prefer("alpha", "scales")
 
 ## Setting the working directory
-here::here("Survival XGBoost Cox analysis")
+out_dir<-here::here("Survival XGBoost Cox analysis")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
 
 ## Setting seed
 seed<-123
