@@ -46,7 +46,9 @@ conflict_prefer("roc","pROC")
 conflicts_prefer(caret::lift)
 
 ## Setting the working directory
-here::here("XGBoost - ERS calculation - binary outcome")
+out_dir<-here::here("XGBoost - ERS calculation - binary outcome")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
 
 ## Setting seed
 seed<-123
