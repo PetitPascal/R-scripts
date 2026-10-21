@@ -1,5 +1,5 @@
 #-------------------------------------------------------------------------------
-## Reproducible & generalizable DLNM script
+## Reproducible and generalizable DLNM script
 #
 # - Simulates time-series exposure-response data with lagged effects
 # - Fits DLNM
@@ -20,6 +20,10 @@ if(any(is_installed == FALSE)){
   install.packages(required_pkgs[!is_installed],repos = "http://cran.us.r-project.org")
 }
 invisible(lapply(required_pkgs, library, character.only = TRUE))
+
+out_dir<-here::here("DLNM analysis")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
 
 #----------------------------------------------------------------
 #### Step 2: Simulating daily time-series data ####
