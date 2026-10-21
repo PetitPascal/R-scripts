@@ -42,7 +42,9 @@ conflict_prefer("slice","dplyr")
 conflict_prefer("alpha","scales")
 
 ## Setting the working directory
-here::here("XGBoost - ERS calculation - linear outcome")
+out_dir<-here::here("XGBoost - ERS calculation - linear outcome")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
 
 ## Setting seed
 seed<-123
