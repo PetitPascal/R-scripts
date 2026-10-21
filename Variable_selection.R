@@ -25,6 +25,10 @@ if(any(is_installed == FALSE)){
 }
 invisible(lapply(required_pkgs, library, character.only = TRUE))
 
+out_dir<-here::here("Variable selection analysis")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
+
 #----------------------------------------------------------------
 #### Simulating data ####
 
