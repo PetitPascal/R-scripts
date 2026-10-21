@@ -42,8 +42,7 @@ here::here("Figure export")
 # - discrete axes: the size is computed from the number and length of the labels and from the text written inside the tiles (geom_text/geom_label)
 # - continuous axes: panel_width x panel_height (cm)
 # - facets with free space keep their relative sizes; fixed-ratio coordinates (coord_fixed, coord_sf) keep their aspect ratio
-# - one plot: the panel size is set directly in the plot layout and the final size is measured on this layout (panels + axes + strips + legend),
-#   widened if the title/subtitle/caption is wider
+# - one plot: the panel size is set directly in the plot layout and the final size is measured on this layout (panels + axes + strips + legend), widened if the title/subtitle/caption is wider
 # - several plots: one single legend, placed at legend_position ("top" = above all plots)
 # - a patchwork object cannot be measured: width/height are used (default 25 x 18 cm)
 # - width, height: optional (cm); override the automatic size
