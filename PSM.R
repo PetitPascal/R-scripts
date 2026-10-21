@@ -19,6 +19,10 @@ invisible(lapply(required_pkgs, library, character.only = TRUE))
 
 set.seed(123)
 
+out_dir<-here::here("PSM analysis")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
+
 #----------------------------------------------------------------
 #### Step 2 - Using example dataset Lalonde available in MatchIt ####
 
