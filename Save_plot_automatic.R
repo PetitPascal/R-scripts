@@ -29,7 +29,9 @@ conflict_prefer("slice","dplyr")
 
 ## Setting the working directory
 
-here::here("Figure export")
+out_dir<-here::here("Figure export")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
 
 #----------------------------------------------------------------
 #### Creating the function ####
