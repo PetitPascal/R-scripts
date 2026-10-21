@@ -22,6 +22,11 @@ invisible(lapply(required_pkgs, library, character.only=TRUE))
 ## Seed
 set.seed(123)  # reproducibility seed (change as needed)
 
+## Setting the working directory (tables and figures are written here)
+out_dir<-here::here("BKMR analysis")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
+
 #----------------------------------------------------------------
 #### Step 2 - Creating helpers ####
 
