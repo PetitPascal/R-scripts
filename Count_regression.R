@@ -32,6 +32,11 @@ conflicted::conflict_prefer("filter", "dplyr")
 conflicted::conflict_prefer("tidy","broom")
 conflicted::conflicts_prefer(stats::predict)
 
+## Setting the working directory (tables and figures are written here)
+out_dir<-here::here("Count regression analysis")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
+
 #----------------------------------------------------------------
 #### Step 2: Simulating datasets ####
 
