@@ -51,6 +51,11 @@ joblib <- import("joblib")
 sklearn_kernels <- import("sklearn.gaussian_process.kernels")
 sklearn_gp <- import("sklearn.gaussian_process")
 
+## Setting the working directory (tables and figures are written here)
+out_dir<-here::here("Multi-class XGBoost analysis")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
+
 #----------------------------------------------------------------
 #### Creating two smiluated datasets ####
 
