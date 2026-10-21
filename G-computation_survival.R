@@ -16,6 +16,10 @@ if(any(is_installed == FALSE)){
 }
 invisible(lapply(required_pkgs, library, character.only=TRUE))
 
+out_dir<-here::here("G-computation analysis")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
+
 #----------------------------------------------------------------
 #### Step 2: Simulating data (replace with your own) ####
 
