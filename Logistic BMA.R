@@ -20,7 +20,9 @@ conflict_prefer("filter", "dplyr")
 conflict_prefer("alpha", "scales")
 
 ## Setting the working directory
-here::here("Logistic BMA")
+out_dir<-here::here("Logistic BMA")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
 
 #----------------------------------------------------------------
 #### Creating functions ####
