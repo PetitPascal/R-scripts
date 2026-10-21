@@ -13,7 +13,7 @@ options(stringsAsFactors=FALSE) # no automatic conversion of characters into fac
 
 ## R packages
 
-required_pkgs<-c("tidyverse","conflicted")
+required_pkgs<-c("tidyverse","conflicted","patchwork")
 
 is_installed<-required_pkgs %in% rownames(installed.packages(all.available=TRUE))
 if(any(is_installed==FALSE)){
@@ -225,7 +225,7 @@ save_plot<-function(plot, name, ncol=1, dpi=300, ext="png", panel_width=9, panel
 ## Creating plots
 
 plot1<-ggplot(airquality,aes(x=factor(Day),y=Ozone))+
-         geom_boxplot()+
+  geom_boxplot()+
   scale_x_discrete("Day")+
   scale_y_continuous("Ozone concentration")+
   theme_bw()
@@ -241,11 +241,11 @@ plot3<-ggplot(airquality, aes(x=Month, y=Day, fill=Ozone)) +
   theme_bw()
 
 plot4<-airquality %>% mutate(Wind=case_when(Wind<10~"Wind<10",
-                                     Wind>15~"Wind>15",
-                                     T~"Wind: 10-15")) %>%
+                                            Wind>15~"Wind>15",
+                                            T~"Wind: 10-15")) %>%
   ggplot() + geom_boxplot(aes(x=factor(Month),y=Ozone)) +
   scale_y_continuous("O3 concentration",breaks=seq(0,200,25), labels=seq(0,200,25), limits=c(0,200)) +
-  scale_x_discrete("Mois",breaks=c(5:9), labels=c("May","June","July","August","September"))+
+  scale_x_discrete("Mois",breaks=c(5:9), labels=c("May","Jun.","Jul.","Aug.","Sept."))+
   theme_bw()+
   facet_grid(.~Wind)
 
