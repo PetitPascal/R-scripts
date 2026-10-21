@@ -1,5 +1,5 @@
 #-------------------------------------------------------------------------------
-## Reproducible & Generalisable Bayesian Weighted Quantile Sum (BWQS) Script
+## Reproducible and generalizable Bayesian Weighted Quantile Sum (BWQS) script
 #
 # - Simulates correlated mixture exposures, covariates, and a binary outcome
 # - Fits BWQS model using the bwqs package
@@ -23,6 +23,11 @@ if(any(is_installed == FALSE)){
   install.packages(required_pkgs[!is_installed],repos = "http://cran.us.r-project.org")
 }
 invisible(lapply(required_pkgs, library, character.only = TRUE))
+
+## Setting the working directory (tables and figures are written here)
+out_dir<-here::here("Bayesian WQS analysis")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
 
 #----------------------------------------------------------------
 #### Step 2: Simulating data ####
