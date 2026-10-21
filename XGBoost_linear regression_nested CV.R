@@ -24,7 +24,9 @@ conflict_prefer("auc", "pROC")
 conflict_prefer("roc", "pROC")
 
 ## Setting the working directory
-here::here("XGBoost - Linear regression - nested CV")
+out_dir<-here::here("XGBoost - Linear regression - nested CV")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
 
 ## Setting seed
 seed<-123
