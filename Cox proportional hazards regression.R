@@ -42,7 +42,9 @@ conflict_prefer("alpha", "scales")
 conflict_prefer("summarize", "dplyr")
 
 ## Setting the working directory
-here::here("Cox proportional hazards regression analysis")
+out_dir<-here::here("Cox proportional hazards regression analysis")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
 
 ## Output folder - user should change the output folder path if needed
 output_dir<-"Results"
