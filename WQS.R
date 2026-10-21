@@ -21,6 +21,10 @@ invisible(lapply(required_pkgs, library, character.only=TRUE))
 
 set.seed(123)   # reproducibility seed (change as needed)
 
+out_dir<-here::here("WQS analysis")
+dir.create(out_dir, showWarnings=FALSE, recursive=TRUE)
+setwd(out_dir)
+
 #----------------------------------------------------------------
 #### Step 2 - Creating utility helper functions ####
 
