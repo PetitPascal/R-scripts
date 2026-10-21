@@ -24,7 +24,7 @@ invisible(lapply(pack_needed, library, character.only = TRUE))
 loaded_model <- readRDS("Example_model.rds") # dependent of the package version, better solution below
 
 # # QS2
-# loaded_model <- qd_read("example_model.qs2")
+# loaded_model <- qd_read("example_model.qs")
 
 # # xgboost
 # loaded_model <- xgb.load("example_model.ubj")
