@@ -1006,7 +1006,7 @@ cat("HR:", ers_surv_metrics$HR, " logHR:", ers_surv_metrics$logHR,
 ## Saving ERS model
 saveRDS(step3_result$final_model, paste0("ERS_model_survival_",Sys.Date(),".rds"))
 xgb.save(step3_result$final_model,paste0("ERS_model_survival_",Sys.Date(),".ubj"))
-qs_save(step3_result$final_model,paste0("ERS_model_survival_",Sys.Date(),".qs"))
+qs_save(step3_result$final_model,paste0("ERS_model_survival_",Sys.Date(),".qs2"))
 
 #----------------------------------------------------------------
 #### Step 4: Overall ERS direction (mixture effect) ####
