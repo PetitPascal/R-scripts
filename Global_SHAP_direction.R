@@ -1004,14 +1004,14 @@ bootstrap_direction_stability<-function(feature=feature, shap_val=shap_val, feat
   
   full_df<-data.frame(feature=feature, shap_val=shap_val, feature_val=feature_val)
   
-  base_res<-global_direction(full_df$feature, full_df$shap_val, full_df$feature_val, ...)
+  base_res<-global_direction(feature=full_df$feature, feature_val=full_df$feature_val, shap_val=full_df$shap_val, ...)
   base_labels<-base_res %>% select(feature, consensus)
   
   boot_labels<-dplyr::bind_rows(lapply(seq_len(n_boot), function(b){
     
     boot_idx<-sample(seq_len(nrow(full_df)), size=nrow(full_df), replace=TRUE)
     boot_df<-full_df[boot_idx, ]
-    boot_res<-global_direction(boot_df$feature, boot_df$shap_val, boot_df$feature_val, ...)
+    boot_res<-global_direction(feature=boot_df$feature, feature_val=boot_df$feature_val, shap_val=boot_df$shap_val, ...)
     boot_res %>% select(feature, consensus) %>% mutate(boot_id=b)
     
   }))
