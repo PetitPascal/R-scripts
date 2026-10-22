@@ -1010,7 +1010,7 @@ cat("Sensitivity:",ers_metrics_full$Sensitivity," Specificity:",ers_metrics_full
 ## Saving ERS model
 saveRDS(step3_result$final_model,paste0("ERS_model_binary_",Sys.Date(),".rds"))
 xgb.save(step3_result$final_model,paste0("ERS_model_binary_",Sys.Date(),".ubj"))
-qs_save(step3_result$final_model,paste0("ERS_model_binary_",Sys.Date(),".qs"))
+qs_save(step3_result$final_model,paste0("ERS_model_binary_",Sys.Date(),".qs2"))
 
 #----------------------------------------------------------------
 #### Step 4: Overall ERS direction (mixture effect) ####
