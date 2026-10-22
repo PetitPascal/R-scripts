@@ -324,8 +324,8 @@ ggsave("wqs_repeated_holdout_weights.png", p_rep, width=9, height=6, dpi=300)
 #### Step 8 - Saving full model object for reproduction ####
 
 saveRDS(wqs_res$gwqs, file="wqs_model_sim.rds") # not stable -> depend on package version
-qs_save(wqs_res$gwqs, file="wqs_model_sim.qs")
-message("Saved WQS model object to wqs_model_sim.rds and wqs_model_sim.qs")
+qs_save(wqs_res$gwqs, file="wqs_model_sim.qs2")
+message("Saved WQS model object to wqs_model_sim.rds and wqs_model_sim.qs2")
 
 #----------------------------------------------------------------
 #### Creating the final helper function ####
