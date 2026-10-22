@@ -956,16 +956,15 @@ global_direction<-function(feature=feature, feature_val=feature_val, shap_val=sh
                       SD_dir=1.5) # most assumption-light -> highest weight
   
   res_1$consensus_weighted<-apply(vote_mat, 1, function(x){
-    
     w<-approach_weights[vote_cols]
+    tot_w<-sum(w)
     pos_w<-sum(w[x=="promoting"], na.rm=TRUE)
     neg_w<-sum(w[x=="mitigating"], na.rm=TRUE)
-    tot_w<-sum(w, na.rm=TRUE)
     if(pos_w==0 && neg_w==0) return("uncertain")
-    if(pos_w/tot_w >= 0.5*sum(w)/tot_w && pos_w > neg_w && pos_w/(pos_w+neg_w) >= 0.6) return("promoting")
-    if(neg_w/(pos_w+neg_w) >= 0.6) return("mitigating")
+    top<-max(pos_w, neg_w)
+    lab<-if(pos_w>=neg_w) "promoting" else "mitigating"
+    if(top/tot_w>=0.5 && top/(pos_w + neg_w)>=0.6) return(lab)
     "uncertain"
-    
   })
   
   res_1
