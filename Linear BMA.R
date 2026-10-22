@@ -94,7 +94,7 @@ summary(bayes2)
 
 ## Saving the model
 saveRDS(bayes2, file = "BMA_model.rds")
-qs_save(bayes2,paste0("BMA_model_",Sys.Date(),".qs"))
+qs_save(bayes2,paste0("BMA_model_",Sys.Date(),".qs2"))
 
 ## Table with determinants identified
 
