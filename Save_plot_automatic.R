@@ -107,7 +107,18 @@ save_plot<-function(plot, name, ncol=1, dpi=300, ext="png", panel_width=9, panel
     tile_txt<-tile_txt[!is.na(tile_txt) & tile_txt!=""]
     tile_fs<-if(any(is_tile)) max(unlist(lapply(b$data[which(is_tile)], function(d) if("size" %in% names(d)) d$size else 3.88)), na.rm=TRUE) * ggplot2::.pt else 11
     tile_w<-if(length(tile_txt)>0) 1.15 * text_cm(unlist(strsplit(tile_txt, "\n", fixed=TRUE)), tile_fs) + 0.6 else 0 # widest line (cm): +15% and padding
-    tile_h<-if(length(tile_txt)>0) (max(stringr::str_count(tile_txt, "\n")) + 1) * tile_fs * pt_cm * 1.4 + 0.5 else 0 # tallest text (cm)
+    
+    # number of labels stacked in the same slot of the discrete axis (e.g., dodged labels of several groups): the slot must be tall enough for all of them
+    n_stack<-1
+    if(any(is_tile)){
+      v_discrete<-tryCatch(sc_v[[1]]$is_discrete(), error=function(e) FALSE)
+      ax<-if(flipped) "x" else "y"
+      n_stack<-max(1, unlist(lapply(b$data[which(is_tile)], function(dl){
+        if(!v_discrete || !all(c(ax, "PANEL") %in% names(dl))) return(1)
+        max(table(dl$PANEL, round(as.numeric(dl[[ax]]))))
+      })))
+    }
+    tile_h<-if(length(tile_txt)>0) n_stack * (max(stringr::str_count(tile_txt, "\n")) + 1) * tile_fs * pt_cm * 1.4 + 0.5 else 0 # height of the stacked labels (cm)
     
     fs_x<-theme_el(p, "axis.text.x", "size", 11)
     fs_y<-theme_el(p, "axis.text.y", "size", 11)
@@ -271,7 +282,7 @@ plot4<-airquality %>% mutate(Wind=case_when(Wind<10~"Wind<10",
                                             T~"Wind: 10-15")) %>%
   ggplot() + geom_boxplot(aes(x=factor(Month),y=Ozone)) +
   scale_y_continuous("O3 concentration",breaks=seq(0,200,25), labels=seq(0,200,25), limits=c(0,200)) +
-  scale_x_discrete("Mois",breaks=c(5:9), labels=c("May","Jun.","Jul.","Aug.","Sept."))+
+  scale_x_discrete("Month",breaks=c(5:9), labels=c("May","Jun.","Jul.","Aug.","Sept."))+
   theme_bw()+
   facet_grid(.~Wind)
 
