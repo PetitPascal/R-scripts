@@ -780,7 +780,7 @@ cat("Correlation(ERS, V):", round(cor(ers,V),3)," R²(ERS~V):", round(cor(ers,V)
 ## Saving ERS model
 saveRDS(step3_result$final_model, paste0("ERS_model_continuous_",Sys.Date(),".rds"))
 xgb.save(step3_result$final_model,paste0("ERS_model_continuous_",Sys.Date(),".ubj"))
-qs_save(step3_result$final_model,paste0("ERS_model_continuous_",Sys.Date(),".qs"))
+qs_save(step3_result$final_model,paste0("ERS_model_continuous_",Sys.Date(),".qs2"))
 
 #----------------------------------------------------------------
 #### Step 4: Overall ERS direction (mixture effect) ####
