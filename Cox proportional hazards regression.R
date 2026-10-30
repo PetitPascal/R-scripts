@@ -262,7 +262,7 @@ X_time_surv_df<-tibble(surv=X_time_surv$surv,
 survfit(cox_mod)
 
 ## Likelihood-ratio test (LRT) for each term
-lrt_results <- drop1(cox_mod, test = "Chisq")
+lrt_results<-drop1(cox_mod, test = "Chisq")
 lrt_results
 
 ## Saving results
@@ -339,8 +339,8 @@ ggsave(schs_resi, file = safe_path(paste0("Scaled Schoenfeld residuals_", Sys.Da
 
 if(!is.null(cluster_var)){ # with shared frailty model (sensitivity check)
   
-  frailty_formula <- update(surv_formula,as.formula(paste(". ~ . + frailty(", cluster_var, ", distribution = 'gamma')")))
-  cox_frailty <- coxph(frailty_formula, data = clean_data, ties = "efron")
+  frailty_formula<-update(surv_formula,as.formula(paste(". ~ . + frailty(", cluster_var, ", distribution = 'gamma')")))
+  cox_frailty<-coxph(frailty_formula, data = clean_data, ties = "efron")
   summary(cox_frailty)
   cox_frailty$history[[1]]$theta # if frailty variance (theta), unobserved clustering is present
   
@@ -373,8 +373,8 @@ ph_plots
 cat_covariates<-covariates[sapply(clean_data[covariates], function(x) is.factor(x) | length(unique(x)) <= 5)]
 if(length(cat_covariates) > 0){
   for(cv in cat_covariates){
-    km_fit <- do.call(survfit,list(formula=as.formula(paste0("Surv(", time_var, ", ", event_var, ") ~ ", cv)),data=clean_data))
-    p_loglog <- ggsurvplot(km_fit,
+    km_fit<-do.call(survfit,list(formula=as.formula(paste0("Surv(", time_var, ", ", event_var, ") ~ ", cv)),data=clean_data))
+    p_loglog<-ggsurvplot(km_fit,
                            fun="cloglog",
                            ggtheme=theme_bw(),
                            title=paste0("log(-log(S(t))) vs. log(t): ", cv),
@@ -394,16 +394,16 @@ fwrite(ph_summary,safe_path(paste0("PH_test_results_", Sys.Date(), ".csv")),sep 
 # - Approach 2 : Restricted cubic splines (RCS) via rms::cph() and rms::anova(). A non-linear (p<alpha_ph) term suggests linearity is violated
 
 # Creating the null model
-null_mod  <- coxph(as.formula(paste0("Surv(", time_var, ", ", event_var, ") ~ 1")),data = clean_data)
+null_mod <-coxph(as.formula(paste0("Surv(", time_var, ", ", event_var, ") ~ 1")),data = clean_data)
 
 # Calculating the martingale residuals
-mart_resid <- residuals(null_mod, type = "martingale")
+mart_resid<-residuals(null_mod, type = "martingale")
 
 # Selecting continuous covariates
-cont_covariates <- covariates[-which(covariates %in% cat_covariates)]
+cont_covariates<-setdiff(covariates, cat_covariates)
 
 # Linearity check
-linearity_plots <- list()
+linearity_plots<-list()
 for(cv in cont_covariates){
   df_plot<-tibble(x=clean_data[[cv]], resid=mart_resid)
   p<-ggplot(df_plot, aes(x=x,y=resid)) +
@@ -414,7 +414,7 @@ for(cv in cont_covariates){
          subtitle="Martingale residuals vs. covariate (loess smooth)",
          x=cv,y="Martingale residual") +
     theme_bw()
-  linearity_plots[[cv]] <- p
+  linearity_plots[[cv]]<-p
   print(p)
 }
 
@@ -428,8 +428,8 @@ non_cont<-setdiff(covariates, cont_covariates)
 all_terms<-c(rcs_terms, non_cont)
 rcs_formula<-as.formula(paste0("Surv(", time_var, ", ", event_var, ") ~ ", paste(all_terms, collapse = " + ")))
 
-cox_rcs <- rms::cph(rcs_formula, data = clean_data, x = TRUE, y = TRUE, surv = TRUE) # RCS model ANOVA (non-linear terms)
-anova_rcs <- anova(cox_rcs)
+cox_rcs<-rms::cph(rcs_formula, data = clean_data, x = TRUE, y = TRUE, surv = TRUE) # RCS model ANOVA (non-linear terms)
+anova_rcs<-anova(cox_rcs)
 anova_rcs
 
 #- - - - - - - - - - - - - - - -
@@ -470,7 +470,7 @@ if(!is.null(interaction_var) && interaction_var %in% covariates){ # if interacti
     m_no_int<-coxph(f_no_int, data = clean_data)
     m_int<-coxph(f_int,    data = clean_data)
     lrt<-anova(m_no_int, m_int)
-    p_value <- lrt$`Pr(>|Chi|)`[2]
+    p_value<-lrt$`Pr(>|Chi|)`[2]
     tibble(covariate=cv,
            interaction=paste0(cv, " × ", interaction_var),
            LRT_chisq=lrt$Chisq[2],
@@ -507,7 +507,7 @@ if(!is.null(interaction_var) && interaction_var %in% covariates){ # if interacti
 #----------------------------------------------------------------
 #### In case of PH violation ####
 
-if(length(ph_violated_vars)>1){
+if(length(ph_violated_vars)>0){
   
   #- - - - - - - - - - - - - - - -
   ## Approach 1: covariate × log(time) interaction terms - covariate x time is also possible
@@ -619,7 +619,7 @@ if(length(ph_violated_vars)>1){
     # Building and fitting the model
     td_terms_ts<-paste0(ph_violated_vars, "_td")
     ts_formula<-as.formula(paste0("Surv(Start_time, Stop_time, ", event_var, ") ~ ",paste(c(covariates, td_terms_ts), collapse = " + ")))
-    cox_td_B <- coxph(ts_formula, data = ts_data, cluster = id, ties = "efron")
+    cox_td_B<-coxph(ts_formula, data = ts_data, cluster = id, ties = "efron")
     summary(cox_td_B)
     
     # Tidy model characteristics
@@ -783,10 +783,8 @@ imap(model_list, function(mod, label){
   
   # version 2
   p2<-broom::tidy(mod,exponentiate=T,conf.int=T) %>%
-    mutate(direction=case_when(conf.low>1~"positive",
-                               conf.high<1~"negative",
-                               T~"uncertain"),
-           HR=cox_mod_charact$HR) %>%
+  mutate(direction=case_when(conf.low>1~"positive", conf.high<1~"negative", T~"uncertain"),
+         HR=paste0(sapply(estimate,test_format)," [",sapply(conf.low,test_format),"; ",sapply(conf.high,test_format),"]")) %>%
     ggplot() + geom_point(aes(x=term,y=estimate,color=factor(direction)),size=2) +
     geom_errorbar(aes(x=term,ymin=conf.low,ymax=conf.high,color=factor(direction)))+
     scale_x_discrete("")+
@@ -910,7 +908,7 @@ if(!is.null(interaction_var)){
   fwrite(as_tibble(logrank_test$pvalue),safe_path(paste0("p-value log-rank test_", Sys.Date(), ".csv")),sep = ";")
   
   # Pre-building the survfit object
-  strat_km_fit <- do.call(survfit,list(formula = strat_km_formula, data = clean_data))
+  strat_km_fit<-do.call(survfit,list(formula = strat_km_formula, data = clean_data))
   
   # Plotting and saving
   walk(list(
