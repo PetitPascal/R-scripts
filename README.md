@@ -30,6 +30,10 @@ Researchers and users are encouraged to adapt these scripts for their own data a
 
 Implementation of a comprehensive Cox proportional hazards regression analysis, suitable for time-to-event data.
 
+•	*Cox_regression_with_time_varying_covariates.R.R*
+
+Implementation of a comprehensive Cox proportional hazards regression analysis, suitable for time-to-event data, with time-varying covariates.
+
 •	*Survival XGBoost Cox analysis.R*
 
 Implementation of Extreme Gradient Boosting (XGBoost) adapted for Cox proportional hazards modeling, suitable for time-to-event data.
@@ -396,6 +400,8 @@ email: pascal.petit.researcher@gmail.com
 •	*Thèse.fr*: https://theses.fr/223750166
 
 ***Current affiliation***: 
+
+•	Univ. Grenoble Alpes, INSERM, CNRS, Grenoble INP*, IAB, EDES, 38000 Grenoble, France
 
 •	Center for Health Services Research, Brandenburg Medical School, Rüdersdorf, Germany
 
