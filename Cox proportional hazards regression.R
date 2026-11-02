@@ -94,7 +94,7 @@ test_format<-function(x){
       x<-if(x>= 1000) as.character(signif(x_save,4)) else as.character(x)
     }
   }
-
+  
   if(sign_x == "neg" && x_raw != 0) x<-paste("-", x, sep = "")
   if(x == "0e+00") x<-"0"
   return(x)
@@ -142,6 +142,58 @@ to_filename<-function(label){
     str_trunc(60, ellipsis = "")             # cap length for OS safety
 }
 
+
+## Function to summarize follow-up, event proportion, cumulative risk and incidence
+#
+# - ev_code: 0 = censored, otherwise the cause (codes)
+# - time in the unit of the data
+# - tpy = number of time units per year
+# - horizon_years = horizon of the cumulative risk
+# - median follow-up: reverse Kaplan-Meier (censoring is treated as the event), with quartiles and 95% CI (Brookmeyer-Crowley) in years
+# - events_per_1000_persons: share of the individuals who had the event during the whole follow-up x 1000, exact binomial 95% CI
+# - cumulative_risk_horizon_pct: Kaplan-Meier (1 - survival) at horizon_years, cause-specific (events of other causes are censored)
+# - incidence_per_1000_py: events / person-years x 1000, exact Poisson 95% CI
+# - person-years = sum of the follow-up times / tpy
+
+rate_table<-function(time, ev_code, codes, labels, tpy, horizon_years=5){
+  py<-sum(time)/tpy
+  n<-length(time)
+  fu<-survfit(Surv(time, as.integer(ev_code==0)) ~ 1)
+  q<-quantile(fu, probs=c(0.25, 0.5, 0.75))
+  fq<-as.numeric(q$quantile)/tpy
+  fl<-as.numeric(q$lower)/tpy
+  fh<-as.numeric(q$upper)/tpy
+  method<-"reverse Kaplan-Meier"
+  if(is.na(fq[2])){
+    fq<-as.numeric(quantile(time, c(0.25, 0.5, 0.75)))/tpy
+    fl<-rep(NA_real_, 3)
+    fh<-rep(NA_real_, 3)
+    method<-"median of the follow-up times (no censoring)"
+  }
+  bind_rows(lapply(codes, function(k){
+    x<-sum(ev_code==k)
+    b<-binom.test(x, n)$conf.int
+    p<-poisson.test(x, py)$conf.int
+    km<-survfit(Surv(time/tpy, as.integer(ev_code==k)) ~ 1)
+    s<-summary(km, times=horizon_years, extend=TRUE)
+    tibble(cause=labels[[as.character(k)]], persons=n, events=x,
+           events_per_1000_persons=1000 * x/n, events_per_1000_persons_low=1000 * b[1], events_per_1000_persons_high=1000 * b[2],
+           cumulative_risk_horizon_pct=100 * (1 - s$surv), cumulative_risk_low=100 * (1 - s$upper), cumulative_risk_high=100 * (1 - s$lower), horizon_years=horizon_years,
+           person_years=py, incidence_per_1000_py=1000 * x/py, incidence_low=1000 * p[1], incidence_high=1000 * p[2],
+           median_follow_up_years=fq[2], median_follow_up_low=fl[2], median_follow_up_high=fh[2], follow_up_q1_years=fq[1], follow_up_q3_years=fq[3],
+           follow_up_method=method)
+  }))
+}
+
+## Function to estimate prevalence at inclusion
+
+prevalence_table<-function(prevalent, label="Disease at inclusion"){
+  x<-sum(prevalent==1, na.rm=TRUE)
+  n<-sum(!is.na(prevalent))
+  b<-binom.test(x, n)$conf.int
+  tibble(condition=label, persons=n, prevalent_cases=x, prevalence_per_1000=1000 * x/n, prevalence_low=1000 * b[1], prevalence_high=1000 * b[2])
+}
+
 #----------------------------------------------------------------
 #### Data import and preprocessing ####
 #
@@ -154,12 +206,12 @@ to_filename<-function(label){
 
 ## Importing the clean dataset - example: survival::colon dataset
 clean_data<-as_tibble(na.omit(survival::colon) %>% filter(etype == 2) %>% select(-c(etype,study)) %>%
-                      mutate(rx=case_when(rx=="Obs"~0,rx=="Lev"~1,T~2)))
+                        mutate(rx=case_when(rx=="Obs"~0,rx=="Lev"~1,T~2)))
 
 ## Renaming outcome variables - user should adjust variable names to match your dataset
 clean_data<-clean_data %>%
-            rename(Disease_status=status,
-                   time_to_diagnosis=time)
+  rename(Disease_status=status,
+         time_to_diagnosis=time)
 
 ## Analysis setting - user should set all key parameters here
 
@@ -204,18 +256,32 @@ rcs_knots<-4
 #### Descritive statistics ####
 
 desc_table<-clean_data %>%
-            select(all_of(c(time_var, event_var, covariates))) %>%
-            tbl_summary(by= all_of(event_var),
-                        missing="no",
-                        statistic=list(all_continuous()  ~ "{mean} ({sd}) / median {median} [{p25}; {p75}]",
-                                       all_categorical() ~ "{n} ({p}%)")) %>%
-            add_overall() %>%
-            add_p() %>%
-            bold_labels()
+  select(all_of(c(time_var, event_var, covariates))) %>%
+  tbl_summary(by= all_of(event_var),
+              missing="no",
+              statistic=list(all_continuous()  ~ "{mean} ({sd}) / median {median} [{p25}; {p75}]",
+                             all_categorical() ~ "{n} ({p}%)")) %>%
+  add_overall() %>%
+  add_p() %>%
+  bold_labels()
 
-fwrite(as_tibble(as.data.frame(desc_table)),
-       safe_path(paste0("Descriptive_statistics_", Sys.Date(), ".csv")),
-       sep = ";")
+fwrite(as_tibble(as.data.frame(desc_table)), safe_path(paste0("Descriptive_statistics_", Sys.Date(), ".csv")), sep = ";")
+
+time_per_year<-365.25 # number of time units of time_var per year (days -> 365.25)
+
+if(is.null(competing_risk_var)){
+  rates<-rate_table(clean_data[[time_var]], as.integer(clean_data[[event_var]]), 1, c("1"="Event"), time_per_year)
+}else{
+  rates<-rate_table(clean_data[[time_var]], as.integer(as.character(clean_data[[competing_risk_var]])), c(1, 2),
+                    c("1"="Event", "2"="Competing event"), time_per_year)
+}
+rates
+fwrite(rates, safe_path(paste0("Descriptive_rates and follow-up_", Sys.Date(), ".csv")), sep=";")
+
+clean_data$prevalent_at_inclusion<-as.integer(clean_data$nodes>=5)
+prev<-prevalence_table(clean_data$prevalent_at_inclusion, "Disease at inclusion")
+prev
+fwrite(prev, safe_path(paste0("Descriptive_prevalence_", Sys.Date(), ".csv")), sep=";")
 
 #----------------------------------------------------------------
 #### Main Cox proportional hazards regression model ####
@@ -236,27 +302,27 @@ summary(cox_mod)
 
 ## Tidy model characteristics
 cox_mod_charact<-broom::tidy(cox_mod, exponentiate = TRUE, conf.int = TRUE) %>%
-                  mutate(direction = case_when(conf.low  > 1 ~ "positive association",
-                                               conf.high < 1 ~ "negative association",
-                                               T~ "uncertain association")) %>%
-                  bind_cols(broom::glance(cox_mod)) %>%
-                  rowwise() %>%
-                  mutate(across(where(is.numeric), test_format)) %>%
-                  ungroup() %>%
-                  mutate(HR = paste0(estimate, " [", conf.low, "; ", conf.high, "]")) %>%
-                  mutate(HR = if_else(HR == " [; ]", "", HR))
+  mutate(direction = case_when(conf.low  > 1 ~ "positive association",
+                               conf.high < 1 ~ "negative association",
+                               T~ "uncertain association")) %>%
+  bind_cols(broom::glance(cox_mod)) %>%
+  rowwise() %>%
+  mutate(across(where(is.numeric), test_format)) %>%
+  ungroup() %>%
+  mutate(HR = paste0(estimate, " [", conf.low, "; ", conf.high, "]")) %>%
+  mutate(HR = if_else(HR == " [; ]", "", HR))
 
 ## Survival probability at X_time
 X_time_surv<-summary(survfit(cox_mod), times=X_time)
 X_time_surv_df<-tibble(surv=X_time_surv$surv,
                        lower=X_time_surv$lower,
                        upper=X_time_surv$upper) %>%
-                rowwise() %>%
-                mutate(across(everything(), test_format)) %>%
-                ungroup() %>%
-                mutate(X_time_result = paste0(surv, " (95% CI: ", lower, "; ", upper, ")"),
-                       times=X_time) %>%
-                select(times,X_time_result)
+  rowwise() %>%
+  mutate(across(everything(), test_format)) %>%
+  ungroup() %>%
+  mutate(X_time_result = paste0(surv, " (95% CI: ", lower, "; ", upper, ")"),
+         times=X_time) %>%
+  select(times,X_time_result)
 
 ## Estimating the median survival time
 survfit(cox_mod)
@@ -359,8 +425,8 @@ ph_summary
 
 # Identifying violated covariates
 ph_violated_vars<-ph_summary %>%
-                  filter(PH_violated & term != "GLOBAL") %>%
-                  pull(term)
+  filter(PH_violated & term != "GLOBAL") %>%
+  pull(term)
 
 # Plotting scaled Schoenfeld residuals
 png(file = safe_path(paste0("PH test_scaled Schoenfeld residuals_", Sys.Date(), ".png")), res = 600, width = 800, height = 700)
@@ -375,11 +441,11 @@ if(length(cat_covariates) > 0){
   for(cv in cat_covariates){
     km_fit<-do.call(survfit,list(formula=as.formula(paste0("Surv(", time_var, ", ", event_var, ") ~ ", cv)),data=clean_data))
     p_loglog<-ggsurvplot(km_fit,
-                           fun="cloglog",
-                           ggtheme=theme_bw(),
-                           title=paste0("log(-log(S(t))) vs. log(t): ", cv),
-                           xlab="log(Time)",
-                           ylab="log(-log(S(t)))")
+                         fun="cloglog",
+                         ggtheme=theme_bw(),
+                         title=paste0("log(-log(S(t))) vs. log(t): ", cv),
+                         xlab="log(Time)",
+                         ylab="log(-log(S(t)))")
     print(p_loglog)
   }
 }
@@ -783,8 +849,8 @@ imap(model_list, function(mod, label){
   
   # version 2
   p2<-broom::tidy(mod,exponentiate=T,conf.int=T) %>%
-  mutate(direction=case_when(conf.low>1~"positive", conf.high<1~"negative", T~"uncertain"),
-         HR=paste0(sapply(estimate,test_format)," [",sapply(conf.low,test_format),"; ",sapply(conf.high,test_format),"]")) %>%
+    mutate(direction=case_when(conf.low>1~"positive", conf.high<1~"negative", T~"uncertain"),
+           HR=paste0(sapply(estimate,test_format)," [",sapply(conf.low,test_format),"; ",sapply(conf.high,test_format),"]")) %>%
     ggplot() + geom_point(aes(x=term,y=estimate,color=factor(direction)),size=2) +
     geom_errorbar(aes(x=term,ymin=conf.low,ymax=conf.high,color=factor(direction)))+
     scale_x_discrete("")+
@@ -805,10 +871,10 @@ imap(model_list, function(mod, label){
   # version 3
   
   if (!grepl("interaction term", label)) {
-  p3<-ggstats::ggcoef_table(mod, exponentiate=T, conf.int=T)
-  
-  ggsave(plot=p3, filename=safe_path(paste0("Forest_plot_v3_", to_filename(label), "_", Sys.Date(), ".png")),
-         dpi=600, width= 35, height= 20, units= "cm", limitsize=F)
+    p3<-ggstats::ggcoef_table(mod, exponentiate=T, conf.int=T)
+    
+    ggsave(plot=p3, filename=safe_path(paste0("Forest_plot_v3_", to_filename(label), "_", Sys.Date(), ".png")),
+           dpi=600, width= 35, height= 20, units= "cm", limitsize=F)
   }
   
   #- - - - - - - - - - - - - - - -
@@ -816,30 +882,30 @@ imap(model_list, function(mod, label){
   
   if (!grepl("interaction term", label) && !grepl("Fine-Gray", label)) {
     
-  # Version 1
-  png(filename = safe_path(paste0("Overall_baseline_survival_v1_", to_filename(label), "_", Sys.Date(), ".png")),
-      res = 600, width = 35, height = 20, units = "cm")
-  ggsurvplot(survfit(mod, data = clean_data),
-                   palette="#40B696",
-                   risk.table=TRUE,
-                   pval=TRUE,
-                   conf.int=TRUE,
-                   ggtheme=theme_cox(),
-                   xlab="Time",
-                   ylab="Overall survival probability")
-  dev.off()
-  
-  # Version 2
-  p2<-survfit2(mod) %>%
-    ggsurvfit(color = "#40B696") +
-    labs(x = "Time", y = "Overall survival probability") +
-    add_confidence_interval(fill = "#40B696") +
-    add_risktable()+
-    theme_cox()
-  
-  ggsave(plot=p2, filename=safe_path(paste0("Overall baseline survival_v2_", to_filename(label), "_", Sys.Date(), ".png")),
-         dpi=600, width= 35, height= 20, units= "cm", limitsize=F)
-  
+    # Version 1
+    png(filename = safe_path(paste0("Overall_baseline_survival_v1_", to_filename(label), "_", Sys.Date(), ".png")),
+        res = 600, width = 35, height = 20, units = "cm")
+    ggsurvplot(survfit(mod, data = clean_data),
+               palette="#40B696",
+               risk.table=TRUE,
+               pval=TRUE,
+               conf.int=TRUE,
+               ggtheme=theme_cox(),
+               xlab="Time",
+               ylab="Overall survival probability")
+    dev.off()
+    
+    # Version 2
+    p2<-survfit2(mod) %>%
+      ggsurvfit(color = "#40B696") +
+      labs(x = "Time", y = "Overall survival probability") +
+      add_confidence_interval(fill = "#40B696") +
+      add_risktable()+
+      theme_cox()
+    
+    ggsave(plot=p2, filename=safe_path(paste0("Overall baseline survival_v2_", to_filename(label), "_", Sys.Date(), ".png")),
+           dpi=600, width= 35, height= 20, units= "cm", limitsize=F)
+    
   }
   
   # Version 3
@@ -894,7 +960,7 @@ imap(model_list, function(mod, label){
                dpi=600, width= 35, height= 20, units= "cm", limitsize=F)
       })
   }
- 
+  
 })
 
 #- - - - - - - - - - - - - - - -
